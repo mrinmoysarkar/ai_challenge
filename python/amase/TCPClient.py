@@ -77,3 +77,6 @@ class AmaseTCPClient(threading.Thread):
             else:
                 raise ValueError("Invalid object received.")
         raise ValueError("Data read not enough for an LMCP header")
+        
+    def sendLMCPmessage(self, msg):
+        self.__socket.send(msg)
