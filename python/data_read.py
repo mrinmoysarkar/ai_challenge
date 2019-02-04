@@ -14,6 +14,9 @@ from afrl.cmasi import LoiterType
 from afrl.cmasi import LoiterDirection
 from afrl.cmasi import Location3D
 from lmcp import LMCPFactory
+from afrl.cmasi.searchai import HazardZoneEstimateReport
+from afrl.cmasi import Polygon
+from afrl.cmasi.searchai import HazardType
 import afrl
 
 
@@ -23,6 +26,7 @@ class PrintLMCPObject(IDataReceived):
     
     def __init__(self):
         self.uavs = [True,True,True,True]
+        self.estimatedHazardZone =  Polygon.Polygon()
         
     def dataReceived(self, lmcpObject):
         #print("message starts::::::")
@@ -43,6 +47,8 @@ class PrintLMCPObject(IDataReceived):
             vehicleId = lmcpObject.get_DetectingEnitiyID()
             if self.uavs[vehicleId-1]:
                 self.sendLoiterCommand(vehicleId, location)
+                self.estimatedHazardZone.get_BoundaryPoints().append(location)
+                self.sendEstimatedReport(self.estimatedHazardZone)
                 self.uavs[vehicleId-1] =  False
         elif isinstance(lmcpObject,afrl.cmasi.searchai.HazardZone.HazardZone):
             print("found HazardZone")
@@ -74,6 +80,16 @@ class PrintLMCPObject(IDataReceived):
         
         amaseClient.sendLMCPmessage(LMCPFactory.packMessage(o, True))
         
+    def sendEstimatedReport(self, estimatedShape):
+        o = HazardZoneEstimateReport.HazardZoneEstimateReport();
+        o.set_EstimatedZoneShape(estimatedShape);
+        o.set_UniqueTrackingID(1);
+        o.set_EstimatedGrowthRate(0);
+        o.set_PerceivedZoneType(HazardType.HazardType.Fire);
+        o.set_EstimatedZoneDirection(0);
+        o.set_EstimatedZoneSpeed(0);
+        
+        amaseClient.sendLMCPmessage(LMCPFactory.packMessage(o, True))
         
 if __name__ == '__main__':
     myHost = 'localhost'
