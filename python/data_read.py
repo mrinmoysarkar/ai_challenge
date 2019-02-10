@@ -7,6 +7,12 @@
 from amase import AmaseTCPClient
 from amase import IDataReceived
 from afrl.cmasi import AirVehicleState
+from afrl.cmasi import SessionStatus
+from afrl.cmasi import AirVehicleConfiguration
+from afrl.cmasi.searchai import HazardZoneDetection
+from afrl.cmasi.searchai import HazardZone
+from afrl.cmasi.searchai import HazardZoneChangeCommand
+
 from afrl.cmasi import VehicleActionCommand
 from afrl.cmasi import LoiterAction
 from afrl.cmasi import CommandStatusType
@@ -18,6 +24,9 @@ from afrl.cmasi.searchai import HazardZoneEstimateReport
 from afrl.cmasi import Polygon
 from afrl.cmasi.searchai import HazardType
 import afrl
+from afrl.cmasi import FlightDirectorAction 
+from afrl.cmasi import SpeedType
+from afrl.cmasi import AltitudeType
 
 
 
@@ -27,21 +36,27 @@ class PrintLMCPObject(IDataReceived):
     def __init__(self):
         self.uavs = [True,True,True,True]
         self.estimatedHazardZone =  Polygon.Polygon()
+        self.turn = True
         
     def dataReceived(self, lmcpObject):
         #print("message starts::::::")
         #print(lmcpObject.toXMLStr(""))
         #print(lmcpObject)
-        if isinstance(lmcpObject,afrl.cmasi.AirVehicleState.AirVehicleState):
-            #print("found air vehicle state")
+        if self.turn:
+            vehicleId = 2
+            #self.sendHeadingAngleCommand(vehicleId)
+            self.turn = False
+        
+        if isinstance(lmcpObject, AirVehicleState.AirVehicleState):
+            print("found air vehicle state")
             pass
-        elif isinstance(lmcpObject,afrl.cmasi.SessionStatus.SessionStatus):
+        elif isinstance(lmcpObject, SessionStatus.SessionStatus):
             #print("found session status")
             pass
-        elif isinstance(lmcpObject,afrl.cmasi.AirVehicleConfiguration.AirVehicleConfiguration):
+        elif isinstance(lmcpObject, AirVehicleConfiguration.AirVehicleConfiguration):
             #print("found AirVehicleConfiguration") 
             pass
-        elif isinstance(lmcpObject,afrl.cmasi.searchai.HazardZoneDetection.HazardZoneDetection):
+        elif isinstance(lmcpObject, HazardZoneDetection.HazardZoneDetection):
             print("found HazardZoneDetection")
             location = lmcpObject.get_DetectedLocation()
             vehicleId = lmcpObject.get_DetectingEnitiyID()
@@ -50,14 +65,33 @@ class PrintLMCPObject(IDataReceived):
                 self.estimatedHazardZone.get_BoundaryPoints().append(location)
                 self.sendEstimatedReport(self.estimatedHazardZone)
                 self.uavs[vehicleId-1] =  False
-        elif isinstance(lmcpObject,afrl.cmasi.searchai.HazardZone.HazardZone):
+        elif isinstance(lmcpObject, HazardZone.HazardZone):
             print("found HazardZone")
-        elif isinstance(lmcpObject,afrl.cmasi.searchai.HazardZoneChangeCommand.HazardZoneChangeCommand):
+        elif isinstance(lmcpObject, HazardZoneChangeCommand.HazardZoneChangeCommand):
             print("found HazardZoneChangeCommand")
             
             
         #print("message ends::::::::", myHost)
+    
+    def sendHeadingAngleCommand(self,vehicleId):
+        o = VehicleActionCommand.VehicleActionCommand()
+        flightDirectorAction = FlightDirectorAction.FlightDirectorAction();
         
+        o.set_VehicleID(vehicleId)
+        o.set_Status(CommandStatusType.CommandStatusType.Pending)
+        o.set_CommandID(1)
+   
+        flightDirectorAction.set_Speed(30)
+        flightDirectorAction.set_SpeedType(SpeedType.SpeedType.Airspeed)
+        flightDirectorAction.set_Heading(10)
+        flightDirectorAction.set_Altitude(100)
+        flightDirectorAction.set_AltitudeType(AltitudeType.AltitudeType.MSL)
+        flightDirectorAction.set_ClimbRate(0)
+        
+        o.get_VehicleActionList().append(flightDirectorAction)
+        
+        amaseClient.sendLMCPmessage(LMCPFactory.packMessage(o, True))
+    
     def sendLoiterCommand(self,vehicleId,location):
         o = VehicleActionCommand.VehicleActionCommand()
         loiterAction = LoiterAction.LoiterAction();
