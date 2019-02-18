@@ -49,6 +49,10 @@ class PrintLMCPObject(IDataReceived):
         
         if isinstance(lmcpObject, AirVehicleState.AirVehicleState):
             print("found air vehicle state")
+            # print(lmcpObject.ID)
+            # print(lmcpObject.Location.Latitude)
+            # print(lmcpObject.Location.Longitude)
+            # print(lmcpObject.Location.Altitude)
             pass
         elif isinstance(lmcpObject, SessionStatus.SessionStatus):
             #print("found session status")
@@ -72,6 +76,7 @@ class PrintLMCPObject(IDataReceived):
             
             
         #print("message ends::::::::", myHost)
+        
     
     def sendHeadingAngleCommand(self,vehicleId):
         o = VehicleActionCommand.VehicleActionCommand()
