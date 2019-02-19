@@ -135,7 +135,7 @@ class SampleHazardDetector(IDataReceived):
             
             if not veicleid in self.__uavsLoiter:
                 self.__uavsLoiter[veicleid] = True
-                self.sendLoiterCommand(veicleid,self.__centerLocation,5000*(self.__noOfUAVs-veicleid+1))
+                self.sendLoiterCommand(veicleid,self.__centerLocation,5000*veicleid)
                 
             if not veicleid in self.__uavsgothint and self.__gotHint and not veicleid in self.__uavsisinfirezone:
                 self.__uavsgothint[veicleid] = True
