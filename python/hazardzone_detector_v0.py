@@ -340,7 +340,7 @@ class SampleHazardDetector(IDataReceived):
         loc1XY = self.convertLatLonToxy(loc1.get_Latitude(),loc1.get_Longitude())
         loc2XY = self.convertLatLonToxy(loc2.get_Latitude(),loc2.get_Longitude())
         d = (loc1XY[0] - loc2XY[0])**2 + (loc1XY[1] - loc2XY[1])**2
-        print(d)
+        #print(d)
         return d
     
     def turn(self,veicleid):
