@@ -11,6 +11,7 @@ from lmcp import LMCPFactory
 ## ===============================================================================
 
 from lmcp import LMCPFactory
+from lmcp import LMCPObject
 import abc
 import threading
 
@@ -20,7 +21,6 @@ class IDataReceived(abc.ABC):
         pass
 
 class AmaseTCPClient(threading.Thread):
-
     def __init__(self, host, port):
         super().__init__()
         self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -31,13 +31,21 @@ class AmaseTCPClient(threading.Thread):
         self.__port = port
 
     def connect(self):
-        while True:
+        while True and not self.__stop_reading:
             try:
                 self.__socket.settimeout(5)
                 self.__socket.connect((self.__host, self.__port))
                 return True
             except Exception as ex:
                 print("Timed out waiting for server connection, trying again")
+
+    def sendLMCPObject(self, lmcpObj):
+        if isinstance(lmcpObj, LMCPObject.LMCPObject):
+            buf = bytearray()
+            buf.extend(LMCPFactory.packMessage(lmcpObj, True))
+            self.__socket.send(buf)
+        else:
+            raise ValueError("Not an LMCP Object.  Non-LMCP message to AMASE not supported")
 
     def addReceiveCallback(self, iDataRcv):
         if(isinstance(iDataRcv, IDataReceived)):
@@ -64,7 +72,7 @@ class AmaseTCPClient(threading.Thread):
                     print("Unknown Error reading AMASE data")
                     print(ex)
                     return False
-            return True
+        return True
 
     def __readLMCPDataFromSocket(self):
         data = bytearray(self.__socket.recv(LMCPFactory.HEADER_SIZE))
@@ -76,7 +84,7 @@ class AmaseTCPClient(threading.Thread):
                 return recv_obj
             else:
                 raise ValueError("Invalid object received.")
+        if(len(data) == 0):
+            return
         raise ValueError("Data read not enough for an LMCP header")
-        
-    def sendLMCPmessage(self, msg):
-        self.__socket.send(msg)
+
