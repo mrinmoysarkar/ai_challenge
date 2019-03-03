@@ -237,7 +237,7 @@ class SampleHazardDetector(IDataReceived):
          
         
         missionCommand.get_WaypointList().append(waypoints)
-        self.__client.sendLMCPmessage(LMCPFactory.packMessage(missionCommand,True))
+        self.__client.sendLMCPObject(missionCommand)
     
     def sendHeadingAngleCommand(self,vehicleId,headingangle):
         vehicleActionCommand = VehicleActionCommand()
@@ -256,7 +256,7 @@ class SampleHazardDetector(IDataReceived):
         
         vehicleActionCommand.get_VehicleActionList().append(flightDirectorAction)
         
-        self.__client.sendLMCPmessage(LMCPFactory.packMessage(vehicleActionCommand,True))
+        self.__client.sendLMCPObject(vehicleActionCommand)
     
     def sendLoiterCommand(self, vehicleId, location, radius):
         #Setting up the mission to send to the UAV
@@ -282,7 +282,7 @@ class SampleHazardDetector(IDataReceived):
         vehicleActionCommand.get_VehicleActionList().append(loiterAction)
 
         #Sending the Vehicle Action Command message to AMASE to be interpreted
-        self.__client.sendLMCPmessage(LMCPFactory.packMessage(vehicleActionCommand,True))
+        self.__client.sendLMCPObject(vehicleActionCommand)
 
     def sendEstimateReport(self):
         #Setting up the mission to send to the UAV
@@ -295,7 +295,7 @@ class SampleHazardDetector(IDataReceived):
         hazardZoneEstimateReport.set_EstimatedZoneSpeed(0)
 
         #Sending the Vehicle Action Command message to AMASE to be interpreted
-        self.__client.sendLMCPmessage(LMCPFactory.packMessage(hazardZoneEstimateReport,True))
+        self.__client.sendLMCPObject(hazardZoneEstimateReport)
         
     def convertLatLonToxy(self,lat,long):
         R = 111000
