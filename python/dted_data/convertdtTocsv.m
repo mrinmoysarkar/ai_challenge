@@ -7,6 +7,14 @@ close all;
 [Z4, refvec4, UHL4, DSI4, ACC4] = dted('n40_w121_1arc_v3.dt2');
 
 
-Z = [Z1(1:end-1,1:end-1) Z2(1:end-1,:); Z4(:,1:end-1) Z3];
+Z = [Z1(1:end-1,1:end-1) Z2(1:end-1,:);
+     Z3(:,1:end-1) Z4];
 
 csvwrite('altidata.csv',Z)
+
+i = round(.5766*3600);
+j = round((122-121.2837)*3600);
+
+Z(i,j)
+
+Z1(i,j)

@@ -38,6 +38,7 @@ from afrl.cmasi.WeatherReport import WeatherReport
 from math import sin,cos,atan2,pi,radians,sqrt
 from random import randint
 import pandas as pd
+from afrl.cmasi.searchai.HazardType import HazardType
 # import utm
 
 
@@ -97,21 +98,40 @@ class SampleHazardDetector(IDataReceived):
         self.__closesrWaypointID = {}
         self.__gotowaypointReady = [False,False,False,False]
         self.__zoneCenter = {}
+        self.__zoneboundaryPoints = {}
+        # self.__altidata = pd.read_csv('altidata.csv',header=None)
+        # self.__altidata = self.__altidata.T
         
-        self.__altidata = pd.read_csv('altidata.csv',header=None)
-        self.__altidata = self.__altidata.T
+        self.altidata1 = pd.read_csv('altidata1.csv',header=None)
+        self.altidata1 = self.altidata1.T
+        self.altidata2 = pd.read_csv('altidata2.csv',header=None)
+        self.altidata2 = self.altidata2.T
+        self.altidata3 = pd.read_csv('altidata3.csv',header=None)
+        self.altidata3 = self.altidata3.T
+        self.altidata4 = pd.read_csv('altidata4.csv',header=None)
+        self.altidata4 = self.altidata4.T
+
         self.__latBias = 39
         self.__lonBias = -122
         self.__delAlevation = 3600
         
-        self.__safeHeight = 450
+        self.__safeHeight = 300
         self.__normalSearchAltitude = 450
         
         self.__initLocationOfUAVs = {}
         
         self.__maxAzimuthangle = {}
         self.__minAzimuthangle = {}
-
+        self.__uavsInSearch = {}
+        self.__uavsInSarvey = {}
+        
+        self.__changedirection = {}
+        
+        self.__lasttime = [0,0,0,0,0,0,0,0]
+        self.__lasttime1 = [0,0,0,0,0,0,0,0]
+        self.__previousreportsendTime = 0
+        self.__desiredheading = [0,0,0,0,0,0,0,0]
+        
     def dataReceived(self, lmcpObject):
         #print(lmcpObject)
         if isinstance(lmcpObject,KeepInZone):
@@ -123,7 +143,8 @@ class SampleHazardDetector(IDataReceived):
             self.__searchAreaCenterLong = centerpoint.get_Longitude()
             self.__searchAreaWidth = lmcpObject.Boundary.get_Width()/2.0
             self.__searchAreaHeight = lmcpObject.Boundary.get_Height()/2.0
-            self.calculateGridCoordinate()
+            # self.calculateGridCoordinate()
+            self.calculateGridCoordinateAlt()
             self.__MissionReady = True
             print('found keep in zone')
             # print(self.getAltitude(centerpoint))
@@ -137,13 +158,14 @@ class SampleHazardDetector(IDataReceived):
             
             if self.__simulationTimeSeconds == 0:
                 self.__initLocationOfUAVs[veicleid] = veicleLocation
+                # self.sendGimbleCommand(veicleid,0,-30)
                 
-            if self.__simulationTimeSeconds > 3 and not veicleid in self.__uavsInMission:
-                    self.__uavsInMission[veicleid] = False
-                    self.sendGimbleCommand(veicleid,45)
-                    print('gimble command send')
+            # if self.__simulationTimeSeconds > 3 and not veicleid in self.__uavsInMission:
+                    # self.__uavsInMission[veicleid] = False
+                    # self.sendGimbleCommand(veicleid,45)
+                    # print('gimble command send')
              
-            if False:#self.__simulationTimeSeconds > 0:
+            if self.__simulationTimeSeconds > 0:
                 self.__currentLocationofUAV[veicleid] = veicleLocation
                 # hazardSensorState = airVehicleState.PayloadStateList[2]
                 # footprint = hazardSensorState.Footprint
@@ -157,6 +179,7 @@ class SampleHazardDetector(IDataReceived):
                         if self.__maxSpeedofUAV[id] == maxSpeed:
                             self.sendMissionCommand(id,self.__initLocationOfUAVs[id])
                             self.__uavsInMission[id] = True
+                            self.__uavsInSearch[id] = True
                             zi += 1
                         if zi == self.__noOfZone:
                             break
@@ -178,10 +201,58 @@ class SampleHazardDetector(IDataReceived):
                             self.sendWaypoint(minid,minLoc,endLoc)
                                 # self.sendLoiterCommand(id,self.__zoneCenter[zid+1],3000,self.__maxSpeedofUAV[id])
                                 # break
-                            
-                            
-                # if self.__gotHint and (self.__simulationTime > 18 and self.__simulationTime < 21) or (self.__simulationTime > 36 and self.__simulationTime < 40) or self.__simulationTime > 55:
-                    # self.__sendReport = True
+            
+
+            # # Right direction strategy
+            if veicleid in self.__changedirection and self.__changedirection[veicleid] and (self.__simulationTimeSeconds - self.__lasttime[veicleid-1])>20: 
+                print('change direction called')
+                self.__desiredheading[veicleid-1] = airVehicleState.Heading
+                if self.__counter == 0:
+                    self.__lasttime[veicleid-1] = self.__simulationTimeSeconds
+                    self.__lasttime1[veicleid-1] = self.__simulationTimeSeconds
+                    self.__desiredheading[veicleid-1] = (airVehicleState.Heading + 145)%360
+                    self.__counter = 1
+                elif self.__counter == 1:
+                    self.__desiredheading[veicleid-1] = (airVehicleState.Heading - 145)
+                    self.__desiredheading[veicleid-1] = self.__desiredheading[veicleid-1] if self.__desiredheading[veicleid-1] > 0 else self.__desiredheading[veicleid-1]+360
+                    self.__changedirection[veicleid] = False
+                    self.__counter = 0
+                
+                self.sendHeadingAngleCommandwithcurrentlocation(veicleid,self.__desiredheading[veicleid-1],veicleLocation)
+            elif veicleid in self.__changedirection and not self.__changedirection[veicleid] and (self.__simulationTimeSeconds - self.__lasttime1[veicleid-1])>60:
+                print('hard turn Left')
+                self.__lasttime1[veicleid-1] = self.__simulationTimeSeconds
+                self.__desiredheading[veicleid-1] = (airVehicleState.Heading - 45)
+                self.__desiredheading[veicleid-1] = self.__desiredheading[veicleid-1] if self.__desiredheading[veicleid-1] > 0 else self.__desiredheading[veicleid-1]+360
+            elif veicleid in self.__changedirection:
+                self.sendHeadingAngleCommandwithcurrentlocation(veicleid,self.__desiredheading[veicleid-1],veicleLocation)
+            
+            # #Left direction strategy
+            # if veicleid in self.__changedirection and self.__changedirection[veicleid] and (self.__simulationTimeSeconds - self.__lasttime[veicleid-1])>15: 
+                # print('change direction called')
+                # self.__desiredheading[veicleid-1] = airVehicleState.Heading
+                # if self.__counter == 0:
+                    # self.__lasttime[veicleid-1] = self.__simulationTimeSeconds
+                    # self.__lasttime1[veicleid-1] = self.__simulationTimeSeconds
+                    # self.__desiredheading[veicleid-1] = (airVehicleState.Heading - 145)
+                    # self.__desiredheading[veicleid-1] = self.__desiredheading[veicleid-1] if self.__desiredheading[veicleid-1] > 0 else self.__desiredheading[veicleid-1]+360
+                    # self.__counter = 1
+                # elif self.__counter == 1:
+                    # self.__desiredheading[veicleid-1] = (airVehicleState.Heading + 145)%360
+                    # self.__changedirection[veicleid] = False
+                    # self.__counter = 0
+                
+                # self.sendHeadingAngleCommandwithcurrentlocation(veicleid,self.__desiredheading[veicleid-1],veicleLocation)
+            # elif veicleid in self.__changedirection and not self.__changedirection[veicleid] and (self.__simulationTimeSeconds - self.__lasttime1[veicleid-1])>60:
+                # print('hard turn Right')
+                # self.__lasttime1[veicleid-1] = self.__simulationTimeSeconds
+                # self.__desiredheading[veicleid-1] = (airVehicleState.Heading + 45)%360
+            # elif veicleid in self.__changedirection:
+                # self.sendHeadingAngleCommandwithcurrentlocation(veicleid,self.__desiredheading[veicleid-1],veicleLocation)
+            
+            if self.__gotHint and (self.__simulationTime - self.__previousreportsendTime) > 3:
+                self.__previousreportsendTime = self.__simulationTime
+                self.__sendReport = True
                 
         elif isinstance(lmcpObject, AirVehicleConfiguration):
             airvehicleConfiguration = lmcpObject
@@ -208,21 +279,32 @@ class SampleHazardDetector(IDataReceived):
             hazardDetected = lmcpObject
             detectedLocation = hazardDetected.get_DetectedLocation()
             detectingEntity = hazardDetected.get_DetectingEnitiyID()
-            self.__firezoneHintLocation = detectedLocation
-            self.__gotHint = True
-            self.__lastfireZonelocation[detectingEntity] = detectedLocation
-            self.__insideFireZoneLastTime[detectingEntity] = self.__simulationTimeSeconds
-            if not detectingEntity in self.__uavsisinfirezone:
-                self.__uavsisinfirezone[detectingEntity] = True
-                # self.__currentHeadingAngleUAV[detectingEntity] = 3
-                # self.turn(detectingEntity)
-                
-            if not self.__firezonePoints or not detectingEntity in self.__firezonePoints or not self.__firezonePoints[detectingEntity]:
+            fireZoneType = hazardDetected.get_DetectedHazardZoneType()
+            self.__uavsInSarvey[detectingEntity] = True
+            if fireZoneType == HazardType.Fire:
+                # print('change direction issued')
+                self.__changedirection[detectingEntity] = True
+                self.__firezoneHintLocation = detectedLocation
+                self.__gotHint = True
+                self.__lastfireZonelocation[detectingEntity] = detectedLocation
+                self.__insideFireZoneLastTime[detectingEntity] = self.__simulationTimeSeconds
+                if not detectingEntity in self.__uavsisinfirezone:
+                    self.__uavsisinfirezone[detectingEntity] = True
+                    # self.__currentHeadingAngleUAV[detectingEntity] = 3
+                    # self.turn(detectingEntity)
                 [x,y] = self.convertLatLonToxy(detectedLocation.get_Latitude(),detectedLocation.get_Longitude())
-                self.__firezonePoints[detectingEntity] = [[x,y]]
-            else:
-                [x,y] = self.convertLatLonToxy(detectedLocation.get_Latitude(),detectedLocation.get_Longitude())
-                self.__firezonePoints[detectingEntity].append([x,y])
+                zid = self.getZoneId([x,y])
+                # print('zid: ', zid)
+                if not self.__firezonePoints or not zid in self.__firezonePoints:
+                    
+                    # self.__firezonePoints[detectingEntity] = [[x,y]]
+                    self.__firezonePoints[zid] = [[x,y]]
+                else:
+                    # self.__firezonePoints[detectingEntity].append([x,y])
+                    self.__firezonePoints[zid].append([x,y])
+            elif fireZoneType == HazardType.Smoke:
+                #print('smoke detected')
+                pass
     
     def sendMissionCommand(self,veicleid,veicleLocation):
         missionCommand = MissionCommand()
@@ -265,6 +347,24 @@ class SampleHazardDetector(IDataReceived):
         
         self.__client.sendLMCPObject(missionCommand)
     
+    def sendHeadingAngleCommandwithcurrentlocation(self,veicleid,headingangle,currentlocation):
+        vehicleActionCommand = VehicleActionCommand()
+        vehicleActionCommand.set_VehicleID(veicleid)
+        vehicleActionCommand.set_Status(CommandStatusType.Pending)
+        vehicleActionCommand.set_CommandID(1)
+        
+        flightDirectorAction = FlightDirectorAction();
+        flightDirectorAction.set_Speed(self.__maxSpeedofUAV[veicleid])
+        flightDirectorAction.set_SpeedType(SpeedType.Airspeed)
+        flightDirectorAction.set_Heading(headingangle)
+        flightDirectorAction.set_Altitude(self.getAltitude(currentlocation)+self.__safeHeight)
+        flightDirectorAction.set_AltitudeType(AltitudeType.MSL)
+        flightDirectorAction.set_ClimbRate(0)
+        
+        vehicleActionCommand.get_VehicleActionList().append(flightDirectorAction)
+        
+        self.__client.sendLMCPObject(vehicleActionCommand)
+    
     def sendHeadingAngleCommand(self,veicleid,headingangle):
         vehicleActionCommand = VehicleActionCommand()
         vehicleActionCommand.set_VehicleID(veicleid)
@@ -283,7 +383,7 @@ class SampleHazardDetector(IDataReceived):
         
         self.__client.sendLMCPObject(vehicleActionCommand)
     
-    def sendGimbleCommand(self, veicleid, azimuthangle):
+    def sendGimbleCommand(self, veicleid, azimuthangle,elevationangle):
         #Setting up the mission to send to the UAV
         vehicleActionCommand = VehicleActionCommand()
         vehicleActionCommand.set_VehicleID(veicleid)
@@ -300,14 +400,13 @@ class SampleHazardDetector(IDataReceived):
         gimbleAngleAction = GimbalAngleAction()
         gimbleAngleAction.set_PayloadID(1)
         gimbleAngleAction.set_Azimuth(azimuthangle)
-        gimbleAngleAction.set_Elevation(-45)
+        gimbleAngleAction.set_Elevation(elevationangle)
         gimbleAngleAction.set_Rotation(0)
         
         vehicleActionCommand.get_VehicleActionList().append(gimbleAngleAction)
         
         self.__client.sendLMCPObject(vehicleActionCommand)
         
-    
     def sendLoiterCommand(self, veicleid, location, radius, speed):
         #Setting up the mission to send to the UAV
         vehicleActionCommand = VehicleActionCommand()
@@ -368,7 +467,6 @@ class SampleHazardDetector(IDataReceived):
         b = long-self.__searchAreaCenterLong
         x = R*a
         y = R*cos(radians(lat))*b
-        # print(utm.from_latlon(lat, long))
         return [x,y]
         
     def convertxyToLatLon(self,x,y):
@@ -414,8 +512,8 @@ class SampleHazardDetector(IDataReceived):
                 else:
                     delyn -= delta
                     zy = delyn
-                waypoints = []
                 
+                waypoints = []
                 waypointNumber = 1
                 
                 x = 0
@@ -433,7 +531,7 @@ class SampleHazardDetector(IDataReceived):
                 waypoint.set_AltitudeType(AltitudeType.MSL)
                 waypoint.set_Number(waypointNumber)
                 waypoint.set_NextWaypoint(waypointNumber+1)
-                waypoint.set_Speed(30)
+                waypoint.set_Speed(35)
                 waypoint.set_SpeedType(SpeedType.Airspeed)
                 waypoint.set_ClimbRate(15)
                 waypoint.set_TurnType(TurnType.TurnShort)
@@ -471,18 +569,22 @@ class SampleHazardDetector(IDataReceived):
                                 waypoint.set_Altitude(alti + self.__safeHeight)
                             waypoint.set_AltitudeType(AltitudeType.MSL)
                             waypoint.set_Number(waypointNumber)
-                            if i == row-1 and j == col-1:
-                                waypoint.set_NextWaypoint(1)
-                            else:
-                                waypoint.set_NextWaypoint(waypointNumber+1)
-                            waypoint.set_Speed(30)
+                            
+                            # else:
+                            waypoint.set_NextWaypoint(waypointNumber+1)
+                            waypoint.set_Speed(35)
                             waypoint.set_SpeedType(SpeedType.Airspeed)
                             waypoint.set_ClimbRate(15)
                             waypoint.set_TurnType(TurnType.TurnShort)
                             waypoint.set_ContingencyWaypointA(0)
                             waypoint.set_ContingencyWaypointB(0)
                             waypoints.append(waypoint)
-                            waypointNumber += 1
+                            if i == row-1 and j == col-1:
+                                wpoints = self.getBetweenLatLonwithoutVID(x,y,0,0,waypointNumber,1)
+                                waypoints = waypoints + wpoints
+                                
+                            else:
+                                waypointNumber += 1
                                 
                     else:
                         for j in range(rowseg):
@@ -502,11 +604,9 @@ class SampleHazardDetector(IDataReceived):
                                 waypoint.set_Altitude(alti)
                             waypoint.set_AltitudeType(AltitudeType.MSL)
                             waypoint.set_Number(waypointNumber)
-                            if i == row-1 and j == rowseg-1:
-                                waypoint.set_NextWaypoint(1)
-                            else:
-                                waypoint.set_NextWaypoint(waypointNumber+1)
-                            waypoint.set_Speed(30)
+                            
+                            waypoint.set_NextWaypoint(waypointNumber+1)
+                            waypoint.set_Speed(35)
                             waypoint.set_SpeedType(SpeedType.Airspeed)
                             waypoint.set_ClimbRate(15)
                             waypoint.set_TurnType(TurnType.TurnShort)
@@ -514,7 +614,12 @@ class SampleHazardDetector(IDataReceived):
                             waypoint.set_ContingencyWaypointB(0)
                             
                             waypoints.append(waypoint)
-                            waypointNumber += 1
+                            if i == row-1 and j == rowseg-1:
+                                wpoints = self.getBetweenLatLonwithoutVID(x,y,0,0,waypointNumber,1)
+                                waypoints += wpoints
+                                
+                            else:
+                                waypointNumber += 1
                             
                     # x = w-i*self.__resulationOfGrid - z1*(w)
                     # self.__allGridLocation.append([])
@@ -532,15 +637,194 @@ class SampleHazardDetector(IDataReceived):
                         # self.__allGridLocation[i].append(location)
                         
                         
-                        
-                        
+                     
                 self.__waypoints[z1*zone+z2+1] = waypoints
+                
                 zlocation = Location3D()
                 [lat,lon] = self.convertxyToLatLon(zx,zy)
                 zlocation.set_Latitude(lat)
                 zlocation.set_Longitude(lon)
                 zlocation.set_Altitude(450)
                 self.__zoneCenter[z1*zone+z2+1] = zlocation
+    
+    def calculateGridCoordinateAlt(self):
+        self.__zoneCenter = {}
+        self.__allGridLocation = []
+        self.__waypoints = {}
+        w = self.__searchAreaWidth
+        h = self.__searchAreaHeight
+        A = (w*h*4)/self.__noOfZone
+        a = sqrt(A)
+
+
+        waypointNumber = 1
+
+        x = 0
+        y = 0
+
+        [lat,lon] = self.convertxyToLatLon(x,y)
+        waypoint = Waypoint()
+        waypoint.set_Latitude(lat)
+        waypoint.set_Longitude(lon)
+        alti = self.getAltitudeLatLon(lat,lon) 
+        if alti < self.__normalSearchAltitude:
+            waypoint.set_Altitude(self.__normalSearchAltitude)
+        else:
+            waypoint.set_Altitude(alti + self.__safeHeight)
+        waypoint.set_AltitudeType(AltitudeType.MSL)
+        waypoint.set_Number(waypointNumber)
+        waypoint.set_NextWaypoint(waypointNumber+1)
+        waypoint.set_Speed(30)
+        waypoint.set_SpeedType(SpeedType.Airspeed)
+        waypoint.set_ClimbRate(15)
+        waypoint.set_TurnType(TurnType.TurnShort)
+        waypoint.set_ContingencyWaypointA(0)
+        waypoint.set_ContingencyWaypointB(0)
+
+        # zone 1
+        waypoints = []
+        waypoints.append(waypoint)
+                    
+        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(0,0,a,a,2,0)
+        waypoints = waypoints + wpoints
+
+        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(a,a,0,a,waypointNumber,0)
+        waypoints = waypoints + wpoints
+
+        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(0,a,a,0,waypointNumber,0)
+        waypoints = waypoints + wpoints
+
+        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(a,0,0,0,waypointNumber,1)
+        waypoints = waypoints + wpoints
+        self.__waypoints[1] = waypoints
+                
+        zlocation = Location3D()
+        [lat,lon] = self.convertxyToLatLon(a/2,a/2)
+        zlocation.set_Latitude(lat)
+        zlocation.set_Longitude(lon)
+        zlocation.set_Altitude(450)
+        self.__zoneCenter[1] = zlocation
+        self.__zoneboundaryPoints[1] = [[0,0],[a,a],[0,a],[a,0]]
+
+        # zone 2
+        waypoints = []
+        waypoints.append(waypoint)
+          
+        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(0,0,-a,a,2,0)
+        waypoints = waypoints + wpoints
+
+        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(-a,a,-a,0,waypointNumber,0)
+        waypoints = waypoints + wpoints
+
+        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(-a,0,0,a,waypointNumber,0)
+        waypoints = waypoints + wpoints
+
+        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(0,a,0,0,waypointNumber,1)
+        waypoints = waypoints + wpoints
+        self.__waypoints[2] = waypoints
+                
+        zlocation = Location3D()
+        [lat,lon] = self.convertxyToLatLon(-a/2,a/2)
+        zlocation.set_Latitude(lat)
+        zlocation.set_Longitude(lon)
+        zlocation.set_Altitude(450)
+        self.__zoneCenter[2] = zlocation
+        self.__zoneboundaryPoints[2] = [[0,0],[-a,a],[0,a],[-a,0]]
+
+        # zone 3
+        waypoints = []
+        waypoints.append(waypoint)
+                    
+        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(0,0,-a,-a,2,0)
+        waypoints = waypoints + wpoints
+
+        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(-a,-a,-a,0,waypointNumber,0)#
+        waypoints = waypoints + wpoints
+
+        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(-a,0,0,-a,waypointNumber,0)#
+        waypoints = waypoints + wpoints
+
+        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(0,-a,0,0,waypointNumber,1)#
+        waypoints = waypoints + wpoints
+        self.__waypoints[3] = waypoints
+                
+        zlocation = Location3D()
+        [lat,lon] = self.convertxyToLatLon(-a/2,-a/2)
+        zlocation.set_Latitude(lat)
+        zlocation.set_Longitude(lon)
+        zlocation.set_Altitude(450)
+        self.__zoneCenter[3] = zlocation
+        self.__zoneboundaryPoints[3] = [[0,0],[-a,-a],[0,-a],[-a,0]]
+
+        # zone 4
+        waypoints = []
+        waypoints.append(waypoint)
+                    
+        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(0,0,a,-a,2,0)
+        waypoints = waypoints + wpoints
+
+        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(a,-a,a,0,waypointNumber,0)
+        waypoints = waypoints + wpoints
+
+        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(a,0,0,-a,waypointNumber,0)
+        waypoints = waypoints + wpoints
+
+        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(0,-a,0,0,waypointNumber,1)
+        waypoints = waypoints + wpoints
+        self.__waypoints[4] = waypoints
+                
+        zlocation = Location3D()
+        [lat,lon] = self.convertxyToLatLon(a/2,-a/2)
+        zlocation.set_Latitude(lat)
+        zlocation.set_Longitude(lon)
+        zlocation.set_Altitude(450)
+        self.__zoneCenter[4] = zlocation
+        self.__zoneboundaryPoints[4] = [[0,0],[a,-a],[0,-a],[a,0]]
+    
+    def getFourcenter(self,arbitararyCenter): # have to work
+        zid = 0
+        mind = 10e10
+        i=0
+        for zcenter in self.__zoneCenter:
+            d = self.getdistance(arbitararyCenter,zcenter)
+            i += 1
+            if d < mind:
+                mind = d
+                zid = i
+        
+        [x,y] = self.convertLatLonToxy(arbitararyCenter.get_Latitude(),arbitararyCenter.get_Longitude())
+        cornerpoints = self.__zoneboundaryPoints[zid]
+        xc1,yc1 = (cornerpoints[0][0]+x)/2,(cornerpoints[0][1]+y)/2
+        xc2,yc2 = (cornerpoints[1][0]+x)/2,(cornerpoints[1][1]+y)/2
+        xc3,yc3 = (cornerpoints[2][0]+x)/2,(cornerpoints[2][1]+y)/2
+        xc4,yc4 = (cornerpoints[3][0]+x)/2,(cornerpoints[3][1]+y)/2
+        
+        points = [[xc1,yc1],[xc2,yc2],[xc3,yc3],[xc4,yc4]]
+        
+        for vid in self.__currentLocationofUAV.keys():
+            if vid in self.__uavsInSearch and not vid in self.__uavsInSarvey:
+                mind = 10e10
+                i=0
+                zid1 = 0
+                for zcenter in self.__zoneCenter:
+                    d = self.getdistance(arbitararyCenter,self.__currentLocationofUAV[vid])
+                    i += 1
+                    if d < mind:
+                        mind = d
+                        zid1 = i
+                if zid1 == zid:
+                    refPoint = self.convertLatLonToxy(self.__currentLocationofUAV[vid].get_Latitude(),self.__currentLocationofUAV[vid].get_Longitude())
+                    destipoint =  getClosestPoint(self,points,refPoint)
+    
+    def getClosestPoint(self,points,refPoint):
+        mind = 10e10
+        closestPoint = []
+        for i in len(points):
+            d = self.distance(points[i],refPoint)
+            if d < mind:
+                mind = d
+                closestPoint = points[i]
+        return closestPoint
     
     def getNearestZone(self,location,vid):
         minima = 1e10
@@ -606,7 +890,7 @@ class SampleHazardDetector(IDataReceived):
             waypoints.append(waypoint)
             waypointNumber += 1
         
-        y += 2*delx
+        y += 5*delx
         [lat,lon] = self.convertxyToLatLon(x,y)
         waypoint = Waypoint()
         waypoint.set_Latitude(lat)
@@ -615,7 +899,7 @@ class SampleHazardDetector(IDataReceived):
         if alti < self.__normalSearchAltitude:
             waypoint.set_Altitude(self.__normalSearchAltitude)
         else:
-            waypoint.set_Altitude(alti + self.__safeHeight)
+            waypoint.set_Altitude(600)##alti + self.__safeHeight)##
         waypoint.set_AltitudeType(AltitudeType.MSL)
         waypoint.set_Number(waypointNumber)
         waypoint.set_NextWaypoint(waypointNumber+1)
@@ -628,7 +912,7 @@ class SampleHazardDetector(IDataReceived):
         waypoints.append(waypoint)
         waypointNumber += 1
         
-        y -= 4*delx
+        y -= 5*delx
         [lat,lon] = self.convertxyToLatLon(x,y)
         waypoint = Waypoint()
         waypoint.set_Latitude(lat)
@@ -637,7 +921,7 @@ class SampleHazardDetector(IDataReceived):
         if alti < self.__normalSearchAltitude:
             waypoint.set_Altitude(self.__normalSearchAltitude)
         else:
-            waypoint.set_Altitude(alti + self.__safeHeight)
+            waypoint.set_Altitude(600)##alti + self.__safeHeight)
         waypoint.set_AltitudeType(AltitudeType.MSL)
         waypoint.set_Number(waypointNumber)
         waypoint.set_NextWaypoint(waypointNumber-2)
@@ -684,7 +968,7 @@ class SampleHazardDetector(IDataReceived):
                 waypoint.set_NextWaypoint(waypointNumber+1)
             waypoint.set_Speed(self.__maxSpeedofUAV[vid])
             waypoint.set_SpeedType(SpeedType.Airspeed)
-            waypoint.set_ClimbRate(0)
+            waypoint.set_ClimbRate(15)
             waypoint.set_TurnType(TurnType.TurnShort)
             waypoint.set_ContingencyWaypointA(0)
             waypoint.set_ContingencyWaypointB(0)
@@ -693,28 +977,232 @@ class SampleHazardDetector(IDataReceived):
         waypointNumber -= 1
         return waypoints, startwaypointId+1
     
+    def getBetweenLatLonwithoutVID(self,xs,ys,xe,ye,startwaypointId,connectingwaypointId):
+        delx = xe-xs
+        dely = ye-ys
+        d = delx**2 + dely**2
+        m = dely/delx
+        ii = int(round(sqrt(d)/500))
+        delx /= ii
+        ii = ii - 1
+        x = xs
+        waypointNumber = startwaypointId+1
+        waypoints = []
+        x += delx
+        for i in range(ii):
+            y = ys + (x-xs)*m + 300
+            [lat,lon] = self.convertxyToLatLon(x,y)
+            x += delx
+            waypoint = Waypoint()
+            waypoint.set_Latitude(lat)
+            waypoint.set_Longitude(lon)
+            alti = self.getAltitudeLatLon(lat,lon) 
+            if alti < self.__normalSearchAltitude:
+                waypoint.set_Altitude(self.__normalSearchAltitude)
+            else:
+                waypoint.set_Altitude(alti + self.__safeHeight)
+            waypoint.set_AltitudeType(AltitudeType.MSL)
+            waypoint.set_Number(waypointNumber)
+            if i == ii-1:
+                waypoint.set_NextWaypoint(connectingwaypointId)
+            else:
+                waypoint.set_NextWaypoint(waypointNumber+1)
+            waypoint.set_Speed(35)
+            waypoint.set_SpeedType(SpeedType.Airspeed)
+            waypoint.set_ClimbRate(15)
+            waypoint.set_TurnType(TurnType.TurnShort)
+            waypoint.set_ContingencyWaypointA(0)
+            waypoint.set_ContingencyWaypointB(0)
+            waypoints.append(waypoint)
+            waypointNumber += 1
+        
+        return waypoints
+    
+    def getBetweenLatLonwithoutVIDAlt(self,xs,ys,xe,ye,waypointNumber,option):
+        delx = xe-xs
+        dely = ye-ys
+        d = delx**2 + dely**2
+        if delx != 0:
+            m = dely/delx
+        ii = int(round(sqrt(d)/100))
+        delx /= ii
+        dely /= ii
+        ii = ii - 1
+        x = xs
+        y = ys
+        waypoints = []
+        x += delx
+        for i in range(ii):
+            if delx == 0:
+                y += dely
+            else:
+                y = ys + (x-xs)*m 
+            [lat,lon] = self.convertxyToLatLon(x,y)
+            x += delx
+            waypoint = Waypoint()
+            waypoint.set_Latitude(lat)
+            waypoint.set_Longitude(lon)
+            alti = self.getAltitudeLatLon(lat,lon) 
+            if alti < self.__normalSearchAltitude:
+                waypoint.set_Altitude(self.__normalSearchAltitude)
+            else:
+                waypoint.set_Altitude(alti + self.__safeHeight)
+            waypoint.set_AltitudeType(AltitudeType.MSL)
+            waypoint.set_Number(waypointNumber)
+            if option==1 and i == ii-1:
+                waypoint.set_NextWaypoint(1)
+            else:
+                waypoint.set_NextWaypoint(waypointNumber+1)
+            waypoint.set_Speed(30)
+            waypoint.set_SpeedType(SpeedType.Airspeed)
+            waypoint.set_ClimbRate(15)
+            waypoint.set_TurnType(TurnType.TurnShort)
+            waypoint.set_ContingencyWaypointA(0)
+            waypoint.set_ContingencyWaypointB(0)
+            waypoints.append(waypoint)
+            waypointNumber += 1
+        
+        return waypoints,waypointNumber
+    
+    # def getAltitudeLatLon(self,lat,lon):
+        # row = int(round((lat - self.__latBias)*self.__delAlevation))
+        # col = int(round((lon - self.__lonBias)*self.__delAlevation))
+        # sz = self.__altidata.shape
+        # if row >= sz[0]:
+            # row = sz[0]-1
+        # if col >= sz[1]:
+            # col = sz[1]-1
+        # # print(self.__altidata[row][col])
+        # return self.__altidata[row][col]
+    
+    # def getAltitude(self,location):
+        # row = int(round((location.get_Latitude() - self.__latBias)*self.__delAlevation))
+        # col = int(round((location.get_Longitude() - self.__lonBias)*self.__delAlevation))
+        # sz = self.__altidata.shape
+        # # print(sz)
+        # if row >= sz[0]:
+            # row = sz[0]-1
+        # if col >= sz[1]:
+            # col = sz[1]-1
+        # # print(self.__altidata[row][col])
+        # return self.__altidata[row][col]
+    
     def getAltitudeLatLon(self,lat,lon):
-        row = int(round((lat - self.__latBias)*self.__delAlevation))
-        col = int(round((lon - self.__lonBias)*self.__delAlevation))
-        sz = self.__altidata.shape
-        if row >= sz[0]:
-            row = sz[0]-1
-        if col >= sz[1]:
-            col = sz[1]-1
-        # print(self.__altidata[row][col])
-        return self.__altidata[row][col]
+        if (lat - 39.0) <= 1:
+            if abs(lon + 122.0) <= 1:
+                i = round((lat - 39) * 3600) 
+                j = round((lon + 122) * 3600)
+                sz = self.altidata1.shape
+                if i >= sz[0]:
+                    i = sz[0] - 1
+                elif i < 0:
+                    i = 0
+                if j >= sz[1]:
+                    j = sz[1] - 1
+                elif j<0:
+                    j=0
+                Altitude = self.altidata1[i][j]
+            else:
+                i = round((lat - 39) * 3600)
+                j = round((lon + 121) * 3600)
+                sz = self.altidata2.shape
+                if i >= sz[0]:
+                    i = sz[0] - 1
+                elif i < 0:
+                    i = 0
+                if j >= sz[1]:
+                    j = sz[1] - 1
+                elif j < 0:
+                    j = 0
+                Altitude = self.altidata2[i][j]
+        else:
+            if (lon + 122) <= 1:
+                i = round((lat - 40) * 3600)
+                j = round((lon + 122) * 3600) 
+                sz = self.altidata3.shape
+                if i >= sz[0]:
+                    i = sz[0] - 1
+                elif i < 0:
+                    i = 0
+                if j >= sz[1]:
+                    j = sz[1] - 1
+                elif j < 0:
+                    j = 0
+                Altitude = self.altidata3[i][j] 
+            else:
+                i = round((lat - 40) * 3600)
+                j = round((lon + 121) * 3600)
+                sz = self.altidata4.shape
+                if i >= sz[0]:
+                    i = sz[0] - 1
+                elif i < 0:
+                    i = 0
+                if j >= sz[1]:
+                    j = sz[1] - 1
+                elif j < 0:
+                    j = 0
+                Altitude = self.altidata4[i][j]
+        return Altitude
     
     def getAltitude(self,location):
-        row = int(round((location.get_Latitude() - self.__latBias)*self.__delAlevation))
-        col = int(round((location.get_Longitude() - self.__lonBias)*self.__delAlevation))
-        sz = self.__altidata.shape
-        # print(sz)
-        if row >= sz[0]:
-            row = sz[0]-1
-        if col >= sz[1]:
-            col = sz[1]-1
-        # print(self.__altidata[row][col])
-        return self.__altidata[row][col]
+        lat = location.get_Latitude()
+        lon = location.get_Longitude()
+        if (lat - 39.0) <= 1:
+            if abs(lon + 122.0) <= 1:
+                i = round((lat - 39) * 3600)
+                j = round((lon + 122) * 3600)
+                sz = self.altidata1.shape
+                if i >= sz[0]:
+                    i = sz[0] - 1
+                elif i < 0:
+                    i = 0
+                if j >= sz[1]:
+                    j = sz[1] - 1
+                elif j<0:
+                    j=0
+                Altitude = self.altidata1[i][j]
+            else:
+                i = round((lat - 39) * 3600)
+                j = round((lon + 121) * 3600)
+                sz = self.altidata2.shape
+                if i >= sz[0]:
+                    i = sz[0] - 1
+                elif i < 0:
+                    i = 0
+                if j >= sz[1]:
+                    j = sz[1] - 1
+                elif j < 0:
+                    j = 0
+                Altitude = self.altidata2[i][j]
+        else:
+            if (lon + 122) <= 1:
+                i = round((lat - 40) * 3600)
+                j = round((lon + 122) * 3600)
+                sz = self.altidata3.shape
+                if i >= sz[0]:
+                    i = sz[0] - 1
+                elif i < 0:
+                    i = 0
+                if j >= sz[1]:
+                    j = sz[1] - 1
+                elif j < 0:
+                    j = 0
+                Altitude = self.altidata3[i][j] 
+            else:
+                i = round((lat - 40) * 3600)
+                j = round((lon + 121) * 3600)
+                sz = self.altidata4.shape
+                if i >= sz[0]:
+                    i = sz[0] - 1
+                elif i < 0:
+                    i = 0
+                if j >= sz[1]:
+                    j = sz[1] - 1
+                elif j < 0:
+                    j = 0
+                Altitude = self.altidata4[i][j]
+        return Altitude
+        
     
     def getNextLoiterCenter(self,veicleid,refLocation):
         if veicleid == 2:
@@ -734,7 +1222,6 @@ class SampleHazardDetector(IDataReceived):
             location.set_Latitude(lat)
             location.set_Longitude(lon)
             location.set_Altitude(refLocation.get_Altitude())
-            # print(lat,lon,'  x,y ',xr,y)
             return location
         if veicleid == 4:
             [xr,yr] = self.convertLatLonToxy(refLocation.get_Latitude(),refLocation.get_Longitude())
@@ -744,13 +1231,11 @@ class SampleHazardDetector(IDataReceived):
             location.set_Latitude(lat)
             location.set_Longitude(lon)
             location.set_Altitude(refLocation.get_Altitude())
-            # print(lat,lon,'  x,y ',xr,y)
             return location
         return refLocation
     
     def isinKeepInZone(self,location):
         xyposition = self.convertLatLonToxy(location.get_Latitude(),location.get_Longitude())
-        # print(xyposition[0],' width: ', self.__searchAreaWidth, xyposition[1], ' height: ',self.__searchAreaHeight)
         if abs(xyposition[0]) <= self.__searchAreaWidth and abs(xyposition[1]) <= self.__searchAreaHeight:
             return True
         return False
@@ -758,7 +1243,6 @@ class SampleHazardDetector(IDataReceived):
     def isLeavingFireZone(self,veicleid,location):
         if self.__lastfireZonelocation:
             if veicleid in self.__lastfireZonelocation:
-                # print(self.__firezonePoints)
                 lastFireLocation =  self.__lastfireZonelocation[veicleid]
                 lastFireLocationXY = self.convertLatLonToxy(lastFireLocation.get_Latitude(),lastFireLocation.get_Longitude())
                 locationXY = self.convertLatLonToxy(location.get_Latitude(),location.get_Longitude())
@@ -768,6 +1252,21 @@ class SampleHazardDetector(IDataReceived):
             
         return False
 
+    def getZoneId(self,point):
+        zlocation = Location3D()
+        [lat,lon] = self.convertxyToLatLon(point[0],point[1])
+        zlocation.set_Latitude(lat)
+        zlocation.set_Longitude(lon)
+        mind =10e20
+        zid = 0
+        for id in self.__zoneCenter.keys():
+            zc = self.__zoneCenter[id]
+            d = self.getdistance(zlocation,zc)
+            if d < mind:
+                mind = d
+                zid = id
+        return zid
+    
     def getdistance(self,loc1,loc2):
         loc1XY = self.convertLatLonToxy(loc1.get_Latitude(),loc1.get_Longitude())
         loc2XY = self.convertLatLonToxy(loc2.get_Latitude(),loc2.get_Longitude())
@@ -775,99 +1274,99 @@ class SampleHazardDetector(IDataReceived):
         # print(d)
         return d
     
-    def turn(self,veicleid,left):
-        delang = 15
-        if left == 0:
-            if self.__currentHeadingAngleUAV[veicleid] < delang:
-                self.__currentHeadingAngleUAV[veicleid] = 360 - delang
-            else:
-                self.__currentHeadingAngleUAV[veicleid] -= delang
-        elif left == 1:
-            self.__currentHeadingAngleUAV[veicleid] = (self.__currentHeadingAngleUAV[veicleid]+delang)%360
-        self.sendHeadingAngleCommand(veicleid,self.__currentHeadingAngleUAV[veicleid])
+    # def turn(self,veicleid,left):
+        # delang = 15
+        # if left == 0:
+            # if self.__currentHeadingAngleUAV[veicleid] < delang:
+                # self.__currentHeadingAngleUAV[veicleid] = 360 - delang
+            # else:
+                # self.__currentHeadingAngleUAV[veicleid] -= delang
+        # elif left == 1:
+            # self.__currentHeadingAngleUAV[veicleid] = (self.__currentHeadingAngleUAV[veicleid]+delang)%360
+        # self.sendHeadingAngleCommand(veicleid,self.__currentHeadingAngleUAV[veicleid])
         
-    def turn(self,veicleid):
-        headingAngle = 0
-        if veicleid == 1:
-            if self.__currentHeadingAngleUAV[veicleid] == 0:
-                self.__currentHeadingAngleUAV[veicleid] = 1
-                if self.__keepoutOption[veicleid-1] == 0:
-                    headingAngle = 90
-                else:
-                    headingAngle = 270
-            elif self.__currentHeadingAngleUAV[veicleid] == 1:
-                self.__currentHeadingAngleUAV[veicleid] = 2
-                headingAngle = 180
-            elif self.__currentHeadingAngleUAV[veicleid] == 2:
-                self.__currentHeadingAngleUAV[veicleid] = 3
-                if self.__keepoutOption[veicleid-1] == 0:
-                    headingAngle = 90
-                else:
-                    headingAngle = 270
-            elif self.__currentHeadingAngleUAV[veicleid] == 3:
-                self.__currentHeadingAngleUAV[veicleid] = 0
-                headingAngle = 0
-        elif veicleid  == 2 :
-            if self.__currentHeadingAngleUAV[veicleid] == 0:
-                self.__currentHeadingAngleUAV[veicleid] = 1
-                if self.__keepoutOption[veicleid-1] == 0:
-                    headingAngle = 270
-                else:
-                    headingAngle = 90
-            elif self.__currentHeadingAngleUAV[veicleid] == 1:
-                self.__currentHeadingAngleUAV[veicleid] = 2
-                headingAngle = 180
-            elif self.__currentHeadingAngleUAV[veicleid] == 2:
-                self.__currentHeadingAngleUAV[veicleid] = 3
-                if self.__keepoutOption[veicleid-1] == 0:
-                    headingAngle = 270
-                else:
-                    headingAngle = 90
-            elif self.__currentHeadingAngleUAV[veicleid] == 3:
-                self.__currentHeadingAngleUAV[veicleid] = 0
-                headingAngle = 0
-        elif veicleid == 3:
-            if self.__currentHeadingAngleUAV[veicleid] == 0:
-                self.__currentHeadingAngleUAV[veicleid] = 1
-                if self.__keepoutOption[veicleid-1] == 0:
-                    headingAngle = 180
-                else:
-                    headingAngle = 0
-            elif self.__currentHeadingAngleUAV[veicleid] == 1:
-                self.__currentHeadingAngleUAV[veicleid] = 2
-                headingAngle = 270
-            elif self.__currentHeadingAngleUAV[veicleid] == 2:
-                self.__currentHeadingAngleUAV[veicleid] = 3
-                if self.__keepoutOption[veicleid-1] == 0:
-                    headingAngle = 180
-                else:
-                    headingAngle = 0
-            elif self.__currentHeadingAngleUAV[veicleid] == 3:
-                self.__currentHeadingAngleUAV[veicleid] = 0
-                headingAngle = 90
-        elif veicleid == 4:
-            if self.__currentHeadingAngleUAV[veicleid] == 0:
-                self.__currentHeadingAngleUAV[veicleid] = 1
-                if self.__keepoutOption[veicleid-1] == 0:
-                    headingAngle = 0
-                else:
-                    headingAngle = 180
-            elif self.__currentHeadingAngleUAV[veicleid] == 1:
-                self.__currentHeadingAngleUAV[veicleid] = 2
-                headingAngle = 270
-            elif self.__currentHeadingAngleUAV[veicleid] == 2:
-                self.__currentHeadingAngleUAV[veicleid] = 3
-                if self.__keepoutOption[veicleid-1] == 0:
-                    headingAngle = 0
-                else:
-                    headingAngle = 180
-            elif self.__currentHeadingAngleUAV[veicleid] == 3:
-                self.__currentHeadingAngleUAV[veicleid] = 0
-                headingAngle = 90
+    # def turn(self,veicleid):
+        # headingAngle = 0
+        # if veicleid == 1:
+            # if self.__currentHeadingAngleUAV[veicleid] == 0:
+                # self.__currentHeadingAngleUAV[veicleid] = 1
+                # if self.__keepoutOption[veicleid-1] == 0:
+                    # headingAngle = 90
+                # else:
+                    # headingAngle = 270
+            # elif self.__currentHeadingAngleUAV[veicleid] == 1:
+                # self.__currentHeadingAngleUAV[veicleid] = 2
+                # headingAngle = 180
+            # elif self.__currentHeadingAngleUAV[veicleid] == 2:
+                # self.__currentHeadingAngleUAV[veicleid] = 3
+                # if self.__keepoutOption[veicleid-1] == 0:
+                    # headingAngle = 90
+                # else:
+                    # headingAngle = 270
+            # elif self.__currentHeadingAngleUAV[veicleid] == 3:
+                # self.__currentHeadingAngleUAV[veicleid] = 0
+                # headingAngle = 0
+        # elif veicleid  == 2 :
+            # if self.__currentHeadingAngleUAV[veicleid] == 0:
+                # self.__currentHeadingAngleUAV[veicleid] = 1
+                # if self.__keepoutOption[veicleid-1] == 0:
+                    # headingAngle = 270
+                # else:
+                    # headingAngle = 90
+            # elif self.__currentHeadingAngleUAV[veicleid] == 1:
+                # self.__currentHeadingAngleUAV[veicleid] = 2
+                # headingAngle = 180
+            # elif self.__currentHeadingAngleUAV[veicleid] == 2:
+                # self.__currentHeadingAngleUAV[veicleid] = 3
+                # if self.__keepoutOption[veicleid-1] == 0:
+                    # headingAngle = 270
+                # else:
+                    # headingAngle = 90
+            # elif self.__currentHeadingAngleUAV[veicleid] == 3:
+                # self.__currentHeadingAngleUAV[veicleid] = 0
+                # headingAngle = 0
+        # elif veicleid == 3:
+            # if self.__currentHeadingAngleUAV[veicleid] == 0:
+                # self.__currentHeadingAngleUAV[veicleid] = 1
+                # if self.__keepoutOption[veicleid-1] == 0:
+                    # headingAngle = 180
+                # else:
+                    # headingAngle = 0
+            # elif self.__currentHeadingAngleUAV[veicleid] == 1:
+                # self.__currentHeadingAngleUAV[veicleid] = 2
+                # headingAngle = 270
+            # elif self.__currentHeadingAngleUAV[veicleid] == 2:
+                # self.__currentHeadingAngleUAV[veicleid] = 3
+                # if self.__keepoutOption[veicleid-1] == 0:
+                    # headingAngle = 180
+                # else:
+                    # headingAngle = 0
+            # elif self.__currentHeadingAngleUAV[veicleid] == 3:
+                # self.__currentHeadingAngleUAV[veicleid] = 0
+                # headingAngle = 90
+        # elif veicleid == 4:
+            # if self.__currentHeadingAngleUAV[veicleid] == 0:
+                # self.__currentHeadingAngleUAV[veicleid] = 1
+                # if self.__keepoutOption[veicleid-1] == 0:
+                    # headingAngle = 0
+                # else:
+                    # headingAngle = 180
+            # elif self.__currentHeadingAngleUAV[veicleid] == 1:
+                # self.__currentHeadingAngleUAV[veicleid] = 2
+                # headingAngle = 270
+            # elif self.__currentHeadingAngleUAV[veicleid] == 2:
+                # self.__currentHeadingAngleUAV[veicleid] = 3
+                # if self.__keepoutOption[veicleid-1] == 0:
+                    # headingAngle = 0
+                # else:
+                    # headingAngle = 180
+            # elif self.__currentHeadingAngleUAV[veicleid] == 3:
+                # self.__currentHeadingAngleUAV[veicleid] = 0
+                # headingAngle = 90
         
 
-        print('turning',veicleid,' heading', headingAngle)
-        self.sendHeadingAngleCommand(veicleid,headingAngle)
+        # print('turning',veicleid,' heading', headingAngle)
+        # self.sendHeadingAngleCommand(veicleid,headingAngle)
             
     def graham_scan(self,points): 
         min_idx=None
@@ -916,30 +1415,34 @@ class SampleHazardDetector(IDataReceived):
         return atan2(y_span,x_span)
 
     def findBoundaryandSendReport(self):
+        # print('in 1')
         allxypoints = self.__boundaryPoints
         if self.__firezonePoints:
             for key in self.__firezonePoints.keys():
                 points = self.__firezonePoints[key]
-                self.__firezonePoints[key] = []
+                # self.__firezonePoints[key] = []
                 # print(points)
-                allxypoints += points
-                    
-        # print(len(allxypoints))
-        boundarypoints = self.graham_scan(allxypoints)
-        self.__boundaryPoints = boundarypoints
-        # print(len(boundarypoints))
-        # print(boundarypoints)
-        for xypoint in boundarypoints:
-            [lat,lon]=self.convertxyToLatLon(xypoint[0],xypoint[1])
-            locationpoint = Location3D()
-            locationpoint.set_Latitude(lat)
-            locationpoint.set_Longitude(lon)
-            self.__estimatedHazardZone.get_BoundaryPoints().append(locationpoint)  
-        self.sendEstimateReport()
-        self.__estimatedHazardZone = Polygon()
+                allxypoints = points
+                   
+                if len(allxypoints) >= 3:
+                    # print(len(allxypoints))
+                    boundarypoints = self.graham_scan(allxypoints)
+                    self.__boundaryPoints = boundarypoints
+                    # print(len(boundarypoints))
+                    # print(boundarypoints)
+                    for xypoint in boundarypoints:
+                        [lat,lon]=self.convertxyToLatLon(xypoint[0],xypoint[1])
+                        locationpoint = Location3D()
+                        locationpoint.set_Latitude(lat)
+                        locationpoint.set_Longitude(lon)
+                        self.__estimatedHazardZone.get_BoundaryPoints().append(locationpoint) 
+                    # print('in 2')            
+                    self.sendEstimateReport()
+                    self.__estimatedHazardZone = Polygon()
 
     def getSendReportStatus(self):
         return self.__sendReport
+    
     def setSendReportStatus(self,status):
         self.__sendReport = status
 
