@@ -150,6 +150,20 @@ class SampleHazardDetector(IDataReceived):
         self.__visitedTotalwaypoints = [0,0,0,0,0,0,0,0,0]
         self.__updateArea = False
         
+        ####experimental
+        self.__NewSTGt1 = [0,0,0,0,0,0,0,0]
+        self.__NewSTGt2 = [0,0,0,0,0,0,0,0]
+        self.__NewSTGt3 = [0,0,0,0,0,0,0,0]
+        self.__NewSTGt4 = [0,0,0,0,0,0,0,0]
+        self.__NewSTGoption = [0,0,0,0,0,0,0,0]
+        self.__NewSTGdt = [2,2,2,2,2,2,2,2]
+        self.__NewSTGleft = [0,0,0,0,0,0,0,0]
+        self.__NewSTGforward = [0,0,0,0,0,0,0,0]
+        self.__NewSTGdtaction = [5,5,5,5,5,5,5,5]
+        self.__NewSTGheadingangle = [0,0,0,0,0,0,0,0]
+        self.__NewSTGfirst = [0,0,0,0,0,0,0,0]
+        self.__NewSTGrefHeading = [0,0,0,0,0,0,0,0]
+        
     def dataReceived(self, lmcpObject):
         
         if isinstance(lmcpObject,KeepInZone):
@@ -183,13 +197,13 @@ class SampleHazardDetector(IDataReceived):
                 if self.__MissionReady:
                     self.sendinitialMission()
                     
-                if airVehicleState.Mode == NavigationMode.Waypoint:
-                    currentwaypointNo = airVehicleState.CurrentWaypoint
-                    if currentwaypointNo != self.__previouswaypointNo[veicleid]:
-                        self.__previouswaypointNo[veicleid] = currentwaypointNo
-                        self.__visitedTotalwaypoints[veicleid-1] += 1
-                        if self.__visitedTotalwaypoints[veicleid-1] >= self.__totalWaypointsassignedToUAV[veicleid]:
-                            print('uav ',veicleid, ' finished its mission')
+                # if airVehicleState.Mode == NavigationMode.Waypoint:
+                    # currentwaypointNo = airVehicleState.CurrentWaypoint
+                    # if currentwaypointNo != self.__previouswaypointNo[veicleid]:
+                        # self.__previouswaypointNo[veicleid] = currentwaypointNo
+                        # self.__visitedTotalwaypoints[veicleid-1] += 1
+                        # if self.__visitedTotalwaypoints[veicleid-1] >= self.__totalWaypointsassignedToUAV[veicleid]:
+                            # print('uav ',veicleid, ' finished its mission')
                 
                 self.checkSurveyStatus(airVehicleState)
                 
@@ -197,14 +211,14 @@ class SampleHazardDetector(IDataReceived):
                     self.__previousreportsendTime = self.__simulationTime
                     self.__sendReport = True
                 
-                if (self.__simulationTimeSeconds - self.__previousWeatherReportTime) > 2 and airVehicleState.WindSpeed > 0:
-                    self.__previousWeatherReportTime = self.__simulationTimeSeconds
-                    self.__wspeed += airVehicleState.WindSpeed
-                    self.__ditectionTheta = airVehicleState.WindDirection
-                    self.__updateArea = True
-                elif airVehicleState.WindSpeed == 0:
-                    self.__wspeed = 0
-                    self.__ditectionTheta = 0
+                # if (self.__simulationTimeSeconds - self.__previousWeatherReportTime) > 2 and airVehicleState.WindSpeed > 0:
+                    # self.__previousWeatherReportTime = self.__simulationTimeSeconds
+                    # self.__wspeed += airVehicleState.WindSpeed
+                    # self.__ditectionTheta = airVehicleState.WindDirection
+                    # self.__updateArea = True
+                # elif airVehicleState.WindSpeed == 0:
+                    # self.__wspeed = 0
+                    # self.__ditectionTheta = 0
                     
         elif isinstance(lmcpObject, AirVehicleConfiguration):
             airvehicleConfiguration = lmcpObject
@@ -227,10 +241,19 @@ class SampleHazardDetector(IDataReceived):
             detectingEntity = hazardDetected.get_DetectingEnitiyID()
             vid = detectingEntity
             fireZoneType = hazardDetected.get_DetectedHazardZoneType()
-            self.__uavsInSarvey[detectingEntity] = True
+            #self.__uavsInSarvey[detectingEntity] = True
             self.__maxSpeedofUAV[detectingEntity] = 18 ## play here
             
             if fireZoneType == HazardType.Fire:
+                self.__uavsInSarvey[detectingEntity] = True
+                if self.__NewSTGoption[vid-1] == 1:
+                    print('found forward',vid)
+                    self.__NewSTGforward[vid-1] = 1
+                elif self.__NewSTGoption[vid-1] == 2:
+                    print('found left',vid)
+                    self.__NewSTGleft[vid-1] = 1
+                    
+                    
                 if self.__changeHangle[vid-1]:
                     self.__changeHangle[vid-1] = False
                     self.sendGimbleCommand(vid,0,-45)
@@ -438,7 +461,8 @@ class SampleHazardDetector(IDataReceived):
         veicleid = vstate.ID
         veicleLocation = vstate.Location
         if veicleid in self.__uavsInSarvey and self.__uavsInSarvey[veicleid]:
-            self.surveyStrategy(veicleid,airVehicleState,veicleLocation)
+            #self.surveyStrategy(veicleid,airVehicleState,veicleLocation)
+            self.surveyNewStrategy(airVehicleState)
         elif not veicleid in self.__uavisHeadingtoSurveylocatio:
             zid = self.getZoneIdLocation(veicleLocation)
             if self.__firezoneHintLocation:
@@ -477,6 +501,137 @@ class SampleHazardDetector(IDataReceived):
                                 if self.__NoofUAVinZone[zid-1]%2 != 0:
                                     self.__veicleStrategiId[minvid-1] = 1
     
+    def surveyNewStrategy(self,airVehicleState):
+        vid = airVehicleState.ID
+        currentlocation = airVehicleState.Location
+        leftstg = self.__veicleStrategiId[vid-1]
+        print("survey new strategy", vid)
+        if leftstg == 0:#left
+            if self.__NewSTGfirst[vid-1] == 0:
+                self.__NewSTGfirst[vid-1] = 1
+                self.__NewSTGrefHeading[vid-1] = airVehicleState.Heading
+                self.__NewSTGheadingangle[vid-1] = (airVehicleState.Heading + 90)%360
+                self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__NewSTGheadingangle[vid-1],currentlocation)
+            else:
+                headingangleError = abs(self.__NewSTGheadingangle[vid-1]-airVehicleState.Heading)
+                headingangleError = headingangleError if headingangleError < 180 else (360-headingangleError)
+                print("survey new strategy left", vid, headingangleError)
+                if headingangleError < 15:
+                    if self.__NewSTGoption[vid-1] == 0 and (self.__simulationTimeSeconds-self.__NewSTGt3[vid-1]) > self.__NewSTGdt[vid-1]:
+                        print('#look forward',vid)
+                        self.__NewSTGforward[vid-1] = 0
+                        self.sendGimbleCommand(vid,0,-45)
+                        self.__NewSTGoption[vid-1] = 1
+                        self.__NewSTGt1[vid-1] = self.__simulationTimeSeconds
+                    elif self.__NewSTGoption[vid-1] == 1 and (self.__simulationTimeSeconds-self.__NewSTGt1[vid-1]) > self.__NewSTGdt[vid-1]:
+                        print('#look left',vid)
+                        if self.__NewSTGforward[vid-1] == 0:
+                            self.__NewSTGforward[vid-1] = 2
+                        self.__NewSTGleft[vid-1] = 0
+                        self.sendGimbleCommand(vid,-90,-45)
+                        self.__NewSTGoption[vid-1] = 2
+                        self.__NewSTGt2[vid-1] = self.__simulationTimeSeconds
+                    elif self.__NewSTGoption[vid-1] == 2 and (self.__simulationTimeSeconds-self.__NewSTGt2[vid-1]) > self.__NewSTGdt[vid-1]:
+                        print('# take action',vid)
+                        if self.__NewSTGleft[vid-1] == 0:
+                            self.__NewSTGleft[vid-1] = 2
+                        self.sendGimbleCommand(vid,0,-45)
+                        self.__NewSTGoption[vid-1] = 0
+                        self.__NewSTGt3[vid-1] = self.__simulationTimeSeconds
+                        
+                        if self.__NewSTGleft[vid-1] == 1 and self.__NewSTGforward[vid-1] == 1:
+                            print('#take right',vid)
+                            self.__NewSTGheadingangle[vid-1] = (airVehicleState.Heading + 90)%360
+                            self.__NewSTGdtaction[vid-1] = 7
+                            self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__NewSTGheadingangle[vid-1],currentlocation)
+                          
+                        elif self.__NewSTGleft[vid-1] == 1 and self.__NewSTGforward[vid-1] == 2:
+                            print('#go straignt',vid)
+                            self.__NewSTGheadingangle[vid-1] = airVehicleState.Heading
+                            self.__NewSTGdtaction[vid-1] = 7
+                            
+                        elif self.__NewSTGleft[vid-1] == 2 and self.__NewSTGforward[vid-1] == 1:
+                            print('#take hard right',vid)
+                            self.__NewSTGheadingangle[vid-1] = (airVehicleState.Heading + 135)%360
+                            self.__NewSTGdtaction[vid-1] = 7
+                            self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__NewSTGheadingangle[vid-1],currentlocation)
+                               
+                        elif self.__NewSTGleft[vid-1] == 2 and self.__NewSTGforward[vid-1] == 2:
+                            print('# take hard left',vid)
+                            self.__NewSTGheadingangle[vid-1] = (airVehicleState.Heading - 30)
+                            self.__NewSTGheadingangle[vid-1] = self.__NewSTGheadingangle[vid-1] if self.__NewSTGheadingangle[vid-1] >= 0 else (self.__NewSTGheadingangle[vid-1] + 360)
+                            self.__NewSTGdtaction[vid-1] = 10
+                            self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__NewSTGheadingangle[vid-1],currentlocation)
+                        
+                if (self.__simulationTimeSeconds - self.__NewSTGt3[vid-1]) > self.__NewSTGdtaction[vid-1]:
+                    self.__NewSTGt3[vid-1] = self.__simulationTimeSeconds
+                    self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__NewSTGheadingangle[vid-1],currentlocation)
+        elif leftstg == 1: #right
+            if self.__NewSTGfirst[vid-1] == 0:
+                self.__NewSTGfirst[vid-1] = 1
+                self.__NewSTGrefHeading[vid-1] = airVehicleState.Heading
+                self.__NewSTGheadingangle[vid-1] = (airVehicleState.Heading - 90)
+                self.__NewSTGheadingangle[vid-1] = self.__NewSTGheadingangle[vid-1] if self.__NewSTGheadingangle[vid-1] >= 0 else (self.__NewSTGheadingangle[vid-1] + 360)
+
+                self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__NewSTGheadingangle[vid-1],currentlocation)
+            else:
+                headingangleError = abs(self.__NewSTGheadingangle[vid-1]-airVehicleState.Heading)
+                headingangleError = headingangleError if headingangleError < 180 else (360-headingangleError)
+                print("survey new strategy right", vid, headingangleError)
+                if headingangleError < 15:
+                    if self.__NewSTGoption[vid-1] == 0 and (self.__simulationTimeSeconds-self.__NewSTGt3[vid-1]) > self.__NewSTGdt[vid-1]:
+                        print('#look forward',vid)
+                        self.__NewSTGforward[vid-1] = 0
+                        self.sendGimbleCommand(vid,0,-45)
+                        self.__NewSTGoption[vid-1] = 1
+                        self.__NewSTGt1[vid-1] = self.__simulationTimeSeconds
+                    elif self.__NewSTGoption[vid-1] == 1 and (self.__simulationTimeSeconds-self.__NewSTGt1[vid-1]) > self.__NewSTGdt[vid-1]:
+                        print('#look right',vid)
+                        if self.__NewSTGforward[vid-1] == 0:
+                            self.__NewSTGforward[vid-1] = 2
+                        self.__NewSTGleft[vid-1] = 0
+                        self.sendGimbleCommand(vid,90,-45)
+                        self.__NewSTGoption[vid-1] = 2
+                        self.__NewSTGt2[vid-1] = self.__simulationTimeSeconds
+                    elif self.__NewSTGoption[vid-1] == 2 and (self.__simulationTimeSeconds-self.__NewSTGt2[vid-1]) > self.__NewSTGdt[vid-1]:
+                        print('# take action',vid)
+                        if self.__NewSTGleft[vid-1] == 0:
+                            self.__NewSTGleft[vid-1] = 2
+                        self.sendGimbleCommand(vid,0,-45)
+                        self.__NewSTGoption[vid-1] = 0
+                        self.__NewSTGt3[vid-1] = self.__simulationTimeSeconds
+                        
+                        if self.__NewSTGleft[vid-1] == 1 and self.__NewSTGforward[vid-1] == 1:
+                            print('#take left',vid)
+                            self.__NewSTGheadingangle[vid-1] = (airVehicleState.Heading - 90)
+                            self.__NewSTGheadingangle[vid-1] = self.__NewSTGheadingangle[vid-1] if self.__NewSTGheadingangle[vid-1] >= 0 else (self.__NewSTGheadingangle[vid-1] + 360)
+
+                            self.__NewSTGdtaction[vid-1] = 7
+                            self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__NewSTGheadingangle[vid-1],currentlocation)
+                          
+                        elif self.__NewSTGleft[vid-1] == 1 and self.__NewSTGforward[vid-1] == 2:
+                            print('#go straignt',vid)
+                            self.__NewSTGheadingangle[vid-1] = airVehicleState.Heading
+                            self.__NewSTGdtaction[vid-1] = 7
+                            
+                        elif self.__NewSTGleft[vid-1] == 2 and self.__NewSTGforward[vid-1] == 1:
+                            print('#take hard left',vid)
+                            self.__NewSTGheadingangle[vid-1] = (airVehicleState.Heading - 135)
+                            self.__NewSTGheadingangle[vid-1] = self.__NewSTGheadingangle[vid-1] if self.__NewSTGheadingangle[vid-1] >= 0 else (self.__NewSTGheadingangle[vid-1] + 360)
+
+                            self.__NewSTGdtaction[vid-1] = 7
+                            self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__NewSTGheadingangle[vid-1],currentlocation)
+                               
+                        elif self.__NewSTGleft[vid-1] == 2 and self.__NewSTGforward[vid-1] == 2:
+                            print('# take hard right',vid)
+                            self.__NewSTGheadingangle[vid-1] = (airVehicleState.Heading + 30)%360
+                            self.__NewSTGdtaction[vid-1] = 10
+                            self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__NewSTGheadingangle[vid-1],currentlocation)
+                        
+                if (self.__simulationTimeSeconds - self.__NewSTGt3[vid-1]) > self.__NewSTGdtaction[vid-1]:
+                    self.__NewSTGt3[vid-1] = self.__simulationTimeSeconds
+                    self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__NewSTGheadingangle[vid-1],currentlocation)
+        
     def surveyStrategy(self,veicleid,airVehicleState,veicleLocation): # need works
         if self.__veicleStrategiId[veicleid-1] == 0:
             # # Right direction strategy
@@ -1453,7 +1608,15 @@ class SampleHazardDetector(IDataReceived):
                 else:
                     NewSamplePoint = SamplePoints
                 self.__firezonePoints[key] = NewSamplePoint
-     
+    
+    def getBig2Factor(self,num):
+        ii = int(num/2)+1
+        for i in range(ii):
+            if i>0 and num%i == 0 and num/i <= i:
+                return i,int(num/i)
+                
+                
+                
 #################
 ## Main
 #################

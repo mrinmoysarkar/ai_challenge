@@ -206,7 +206,7 @@ def height(coordstr):
 	else:
 		raise Exception('you need longitude and latitude')
 
-	dted = DTED('n39.dt2')#DTED(long.mapname() + lat.mapname() + '_SRTM_1_DEM.dt2')
+	dted = DTED('n40.dt2')#DTED(long.mapname() + lat.mapname() + '_SRTM_1_DEM.dt2')
 
 	return dted.data[long.sub_coord()][lat.sub_coord()]
 
@@ -221,5 +221,5 @@ def height(coordstr):
 #   E0104500N471500_SRTM_1_DEM.dt2
 #
  
-# coord = '39.7862N 121.1195W'
-# print(coord, " => ", height(coord));
+coord = '39.7065N 121.1175W'
+print(coord, " => ", height(coord));
