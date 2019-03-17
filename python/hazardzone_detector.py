@@ -42,6 +42,7 @@ from afrl.cmasi.searchai.HazardType import HazardType
 from afrl.cmasi.NavigationMode import NavigationMode
 # import utm
 
+filePath = '../../altitude_data/'
 
 class PrintLMCPObject(IDataReceived):
     def dataReceived(self, lmcpObject):
@@ -101,13 +102,13 @@ class SampleHazardDetector(IDataReceived):
         self.__zoneCenter = {}
         self.__zoneboundaryPoints = {}
         
-        self.altidata1 = pd.read_csv('altidata1.csv',header=None)
+        self.altidata1 = pd.read_csv(filePath+'altidata1.csv',header=None)
         self.altidata1 = self.altidata1.T
-        self.altidata2 = pd.read_csv('altidata2.csv',header=None)
+        self.altidata2 = pd.read_csv(filePath+'altidata2.csv',header=None)
         self.altidata2 = self.altidata2.T
-        self.altidata3 = pd.read_csv('altidata3.csv',header=None)
+        self.altidata3 = pd.read_csv(filePath+'altidata3.csv',header=None)
         self.altidata3 = self.altidata3.T
-        self.altidata4 = pd.read_csv('altidata4.csv',header=None)
+        self.altidata4 = pd.read_csv(filePath+'altidata4.csv',header=None)
         self.altidata4 = self.altidata4.T
 
         self.__latBias = 39
