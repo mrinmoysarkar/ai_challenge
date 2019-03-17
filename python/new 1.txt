@@ -1,0 +1,130 @@
+ def calculateGridCoordinateAlt(self):
+        self.__zoneCenter = {}
+        self.__allGridLocation = []
+        self.__waypoints = {}
+        w = self.__searchAreaWidth
+        h = self.__searchAreaHeight
+        A = (w*h*4)/self.__noOfZone
+        a = sqrt(A)
+
+		
+		waypointNumber = 1
+		
+		x = 0
+		y = 0
+	
+		[lat,lon] = self.convertxyToLatLon(x,y)
+		waypoint = Waypoint()
+		waypoint.set_Latitude(lat)
+		waypoint.set_Longitude(lon)
+		alti = self.getAltitudeLatLon(lat,lon) 
+		if alti < self.__normalSearchAltitude:
+			waypoint.set_Altitude(self.__normalSearchAltitude)
+		else:
+			waypoint.set_Altitude(alti + self.__safeHeight)
+		waypoint.set_AltitudeType(AltitudeType.MSL)
+		waypoint.set_Number(waypointNumber)
+		waypoint.set_NextWaypoint(waypointNumber+1)
+		waypoint.set_Speed(35)
+		waypoint.set_SpeedType(SpeedType.Airspeed)
+		waypoint.set_ClimbRate(15)
+		waypoint.set_TurnType(TurnType.TurnShort)
+		waypoint.set_ContingencyWaypointA(0)
+		waypoint.set_ContingencyWaypointB(0)
+		
+		# zone 1
+		waypoints = []
+		waypoints.append(waypoint)
+					
+		wpoints = self.getBetweenLatLonwithoutVID(0,0,a,a,waypointNumber,0)
+		waypoints = waypoints + wpoints
+		
+		wpoints = self.getBetweenLatLonwithoutVID(a,a,0,a,waypointNumber,0)
+		waypoints = waypoints + wpoints
+        
+		wpoints = self.getBetweenLatLonwithoutVID(0,a,a,0,waypointNumber,0)
+		waypoints = waypoints + wpoints
+		
+		wpoints = self.getBetweenLatLonwithoutVID(a,0,0,0,waypointNumber,1)
+		waypoints = waypoints + wpoints
+		self.__waypoints[1] = waypoints
+                
+		zlocation = Location3D()
+		[lat,lon] = self.convertxyToLatLon(a/2,a/2)
+		zlocation.set_Latitude(lat)
+		zlocation.set_Longitude(lon)
+		zlocation.set_Altitude(450)
+		self.__zoneCenter[1] = zlocation
+		
+		# zone 2
+		waypoints = []
+		waypoints.append(waypoint)
+					
+		wpoints = self.getBetweenLatLonwithoutVID(0,0,-a,a,waypointNumber,0)
+		waypoints = waypoints + wpoints
+		
+		wpoints = self.getBetweenLatLonwithoutVID(-a,a,-a,0,waypointNumber,0)
+		waypoints = waypoints + wpoints
+        
+		wpoints = self.getBetweenLatLonwithoutVID(-a,0,0,a,waypointNumber,0)
+		waypoints = waypoints + wpoints
+		
+		wpoints = self.getBetweenLatLonwithoutVID(0,a,0,0,waypointNumber,1)
+		waypoints = waypoints + wpoints
+		self.__waypoints[2] = waypoints
+                
+		zlocation = Location3D()
+		[lat,lon] = self.convertxyToLatLon(-a/2,a/2)
+		zlocation.set_Latitude(lat)
+		zlocation.set_Longitude(lon)
+		zlocation.set_Altitude(450)
+		self.__zoneCenter[2] = zlocation
+		
+		# zone 3
+		waypoints = []
+		waypoints.append(waypoint)
+					
+		wpoints = self.getBetweenLatLonwithoutVID(0,0,-a,-a,waypointNumber,0)
+		waypoints = waypoints + wpoints
+		
+		wpoints = self.getBetweenLatLonwithoutVID(-a,-a,0,-a,waypointNumber,0)
+		waypoints = waypoints + wpoints
+        
+		wpoints = self.getBetweenLatLonwithoutVID(0,-a,-a,0,waypointNumber,0)
+		waypoints = waypoints + wpoints
+		
+		wpoints = self.getBetweenLatLonwithoutVID(-a,0,0,0,waypointNumber,1)
+		waypoints = waypoints + wpoints
+		self.__waypoints[3] = waypoints
+                
+		zlocation = Location3D()
+		[lat,lon] = self.convertxyToLatLon(-a/2,-a/2)
+		zlocation.set_Latitude(lat)
+		zlocation.set_Longitude(lon)
+		zlocation.set_Altitude(450)
+		self.__zoneCenter[3] = zlocation
+		
+		# zone 4
+		waypoints = []
+		waypoints.append(waypoint)
+					
+		wpoints = self.getBetweenLatLonwithoutVID(0,0,a,-a,waypointNumber,0)
+		waypoints = waypoints + wpoints
+		
+		wpoints = self.getBetweenLatLonwithoutVID(a,-a,a,0,waypointNumber,0)
+		waypoints = waypoints + wpoints
+        
+		wpoints = self.getBetweenLatLonwithoutVID(a,0,0,-a,waypointNumber,0)
+		waypoints = waypoints + wpoints
+		
+		wpoints = self.getBetweenLatLonwithoutVID(0,-a,0,0,waypointNumber,1)
+		waypoints = waypoints + wpoints
+		self.__waypoints[4] = waypoints
+                
+		zlocation = Location3D()
+		[lat,lon] = self.convertxyToLatLon(a/2,-a/2)
+		zlocation.set_Latitude(lat)
+		zlocation.set_Longitude(lon)
+		zlocation.set_Altitude(450)
+		self.__zoneCenter[4] = zlocation
+    

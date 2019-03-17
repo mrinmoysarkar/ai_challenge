@@ -73,7 +73,7 @@ for ws in range(wSeg):
             print(currCenterx,currCentery,'->',currCenterx+dw,currCentery+dh)
             print(currCenterx+dw,currCentery+dh,'->',currCenterx+dw,currCentery)
             print(currCenterx+dw,currCentery,'->',currCenterx,currCentery+dh)
-            print(currCenterx+dh,currCentery,'->',currCenterx,currCentery)
+            print(currCenterx,currCentery+dh,'->',currCenterx,currCentery)
         currCentery += dh
     currCenterx += dw
     currCentery = -h/2

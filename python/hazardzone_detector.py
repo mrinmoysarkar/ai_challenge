@@ -177,7 +177,8 @@ class SampleHazardDetector(IDataReceived):
             self.__searchAreaWidth = lmcpObject.Boundary.get_Width()/2.0
             self.__searchAreaHeight = lmcpObject.Boundary.get_Height()/2.0
             # self.calculateGridCoordinate()
-            self.calculateGridCoordinateAlt()
+            # self.calculateGridCoordinateAlt()
+            self.calculateGridCoordinateAlt1()
             self.__MissionReady = True
             print('found keep in zone')
             
@@ -1018,6 +1019,105 @@ class SampleHazardDetector(IDataReceived):
         self.__zoneCenter[4] = zlocation
         self.__zoneboundaryPoints[4] = [[0,0],[a,-a],[0,-a],[a,0]]
     
+    def calculateGridCoordinateAlt1(self):
+        self.__zoneCenter = {}
+        self.__allGridLocation = []
+        self.__waypoints = {}
+        w = self.__searchAreaWidth*2
+        h = self.__searchAreaHeight*2
+
+
+        wSeg,hSeg = self.getBig2Factor(self.__noOfZone)
+
+        dw = w/wSeg
+        dh = h/hSeg
+        currCenterx = -w/2
+        currCentery = -h/2
+
+        for ws in range(wSeg):
+            for hs in range(hSeg):
+                zoneid = ws*hSeg + hs + 1
+
+                waypointNumber = 1
+
+                x = currCenterx
+                y = currCentery
+
+                [lat,lon] = self.convertxyToLatLon(x,y)
+                waypoint = Waypoint()
+                waypoint.set_Latitude(lat)
+                waypoint.set_Longitude(lon)
+                alti = self.getAltitudeLatLon(lat,lon) 
+                if alti < self.__normalSearchAltitude:
+                    waypoint.set_Altitude(self.__normalSearchAltitude)
+                else:
+                    waypoint.set_Altitude(alti + self.__safeHeight)
+                waypoint.set_AltitudeType(AltitudeType.MSL)
+                waypoint.set_Number(waypointNumber)
+                waypoint.set_NextWaypoint(waypointNumber+1)
+                waypoint.set_Speed(30)
+                waypoint.set_SpeedType(SpeedType.Airspeed)
+                waypoint.set_ClimbRate(15)
+                waypoint.set_TurnType(TurnType.TurnShort)
+                waypoint.set_ContingencyWaypointA(0)
+                waypoint.set_ContingencyWaypointB(0)
+
+                waypoints = []
+                waypoints.append(waypoint)
+                if ws%2==0:
+                    if hs%2 == 0:
+                        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(currCenterx,currCentery,currCenterx+dw,currCentery+dh,2,0)
+                        waypoints = waypoints + wpoints
+                        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(currCenterx+dw,currCentery+dh,currCenterx,currCentery+dh,waypointNumber,0)
+                        waypoints = waypoints + wpoints
+                        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(currCenterx,currCentery+dh,currCenterx+dw,currCentery,waypointNumber,0)
+                        waypoints = waypoints + wpoints
+                        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(currCenterx+dw,currCentery,currCenterx,currCentery,waypointNumber,1)
+                        waypoints = waypoints + wpoints
+                    else:
+                        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(currCenterx,currCentery,currCenterx+dw,currCentery+dh,2,0)
+                        waypoints = waypoints + wpoints
+                        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(currCenterx+dw,currCentery+dh,currCenterx+dw,currCentery,waypointNumber,0)
+                        waypoints = waypoints + wpoints
+                        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(currCenterx+dw,currCentery,currCenterx,currCentery+dh,waypointNumber,0)
+                        waypoints = waypoints + wpoints
+                        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(currCenterx,currCentery+dh,currCenterx,currCentery,waypointNumber,1)
+                        waypoints = waypoints + wpoints
+                else:
+                    if hs%2 != 0:
+                        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(currCenterx,currCentery,currCenterx+dw,currCentery+dh,2,0)
+                        waypoints = waypoints + wpoints
+                        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(currCenterx+dw,currCentery+dh,currCenterx,currCentery+dh,waypointNumber,0)
+                        waypoints = waypoints + wpoints
+                        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(currCenterx,currCentery+dh,currCenterx+dw,currCentery,waypointNumber,0)
+                        waypoints = waypoints + wpoints
+                        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(currCenterx+dw,currCentery,currCenterx,currCentery,waypointNumber,1)
+                        waypoints = waypoints + wpoints
+                    else:
+                        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(currCenterx,currCentery,currCenterx+dw,currCentery+dh,2,0)
+                        waypoints = waypoints + wpoints
+                        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(currCenterx+dw,currCentery+dh,currCenterx+dw,currCentery,waypointNumber,0)
+                        waypoints = waypoints + wpoints
+                        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(currCenterx+dw,currCentery,currCenterx,currCentery+dh,waypointNumber,0)
+                        waypoints = waypoints + wpoints
+                        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(currCenterx,currCentery+dh,currCenterx,currCentery,waypointNumber,1)
+                        waypoints = waypoints + wpoints
+
+                self.__waypoints[zoneid] = waypoints
+
+                zlocation = Location3D()
+                [lat,lon] = self.convertxyToLatLon(currCenterx+dw/2,currCentery+dh/2)
+                zlocation.set_Latitude(lat)
+                zlocation.set_Longitude(lon)
+                zlocation.set_Altitude(450)
+                self.__zoneCenter[zoneid] = zlocation
+                self.__zoneboundaryPoints[zoneid] = [[currCenterx,currCentery],[currCenterx+dw,currCentery],[currCenterx,currCentery+dh],[currCenterx+dw,currCentery+dh]]
+
+                currCentery += dh
+            currCenterx += dw
+            currCentery = -h/2
+        
+
     def getFourcenter(self,arbitararyCenter): # have to work
         zid = 0
         mind = 10e10
@@ -1594,8 +1694,8 @@ class SampleHazardDetector(IDataReceived):
         
     def translateEstimatedShape(self, WinSpeed, Angle):
         Rate = WinSpeed
-        X_Rate = Rate * sin(radians(Angle))
-        Y_Rate = Rate * cos(radians(Angle))
+        X_Rate = Rate * cos(radians(Angle))
+        Y_Rate = Rate * sin(radians(Angle))
         if self.__firezonePoints:
             for key in self.__firezonePoints.keys():
                 points = self.__firezonePoints[key]
