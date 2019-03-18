@@ -164,6 +164,9 @@ class SampleHazardDetector(IDataReceived):
         self.__NewSTGheadingangle = [0,0,0,0,0,0,0,0]
         self.__NewSTGfirst = [0,0,0,0,0,0,0,0]
         self.__NewSTGrefHeading = [0,0,0,0,0,0,0,0]
+
+        self.__currentVicleState = {}
+        self.__simulationTimemilliSeconds = 0
         
     def dataReceived(self, lmcpObject):
         
@@ -181,23 +184,26 @@ class SampleHazardDetector(IDataReceived):
             self.calculateGridCoordinateAlt1()
             self.__MissionReady = True
             print('found keep in zone')
+
+            
             
         elif isinstance(lmcpObject, AirVehicleState):
             airVehicleState = lmcpObject
-            self.__simulationTime = airVehicleState.Time/(1000*60)
-            self.__simulationTimeSeconds = airVehicleState.Time/1000
-            veicleid = airVehicleState.ID
-            veicleLocation = airVehicleState.Location
+            # self.__simulationTime = airVehicleState.Time/(1000*60)
+            # self.__simulationTimeSeconds = airVehicleState.Time/1000
+            self.__simulationTimemilliSeconds = airVehicleState.Time
+            self.__currentVicleState[airVehicleState.ID] = airVehicleState
             
-            if self.__simulationTimeSeconds == 0:
-                self.__initLocationOfUAVs[veicleid] = veicleLocation
+            if self.__simulationTimemilliSeconds == 0:
+                self.__initLocationOfUAVs[airVehicleState.ID] = airVehicleState.Location
+                self.__currentLocationofUAV[airVehicleState.ID] = airVehicleState.Location
              
-            if self.__simulationTimeSeconds > 0:
-                self.__currentLocationofUAV[veicleid] = veicleLocation
-                self.__currentHeadingAngleUAV[veicleid] = airVehicleState.Heading
+            # if self.__simulationTimeSeconds > 0:
+            #     self.__currentLocationofUAV[veicleid] = veicleLocation
+            #     self.__currentHeadingAngleUAV[veicleid] = airVehicleState.Heading
                      
-                if self.__MissionReady:
-                    self.sendinitialMission()
+            #     if self.__MissionReady:
+            #         self.sendinitialMission()
                     
                 # if airVehicleState.Mode == NavigationMode.Waypoint:
                     # currentwaypointNo = airVehicleState.CurrentWaypoint
@@ -207,11 +213,11 @@ class SampleHazardDetector(IDataReceived):
                         # if self.__visitedTotalwaypoints[veicleid-1] >= self.__totalWaypointsassignedToUAV[veicleid]:
                             # print('uav ',veicleid, ' finished its mission')
                 
-                self.checkSurveyStatus(airVehicleState)
+                # self.checkSurveyStatus(airVehicleState)
                 
-                if self.__gotHint and (self.__simulationTime - self.__previousreportsendTime) > 0.3:# and ((self.__simulationTime > 28 and self.__simulationTime < 31) or (self.__simulationTime > 38 and self.__simulationTime < 41) or self.__simulationTime > 58):# or (self.__simulationTime > 55 and (self.__simulationTime - self.__previousreportsendTime) > 1)):
-                    self.__previousreportsendTime = self.__simulationTime
-                    self.__sendReport = True
+                # if self.__gotHint and (self.__simulationTime - self.__previousreportsendTime) > 0.3:# and ((self.__simulationTime > 28 and self.__simulationTime < 31) or (self.__simulationTime > 38 and self.__simulationTime < 41) or self.__simulationTime > 58):# or (self.__simulationTime > 55 and (self.__simulationTime - self.__previousreportsendTime) > 1)):
+                #     self.__previousreportsendTime = self.__simulationTime
+                #     self.__sendReport = True
                 
                 # if (self.__simulationTimeSeconds - self.__previousWeatherReportTime) > 2 and airVehicleState.WindSpeed > 0:
                     # self.__previousWeatherReportTime = self.__simulationTimeSeconds
@@ -228,57 +234,51 @@ class SampleHazardDetector(IDataReceived):
             payloadconfigList = airvehicleConfiguration.PayloadConfigurationList
             self.__maxAzimuthangle[airvehicleConfiguration.ID] = payloadconfigList[0].MaxAzimuth
             self.__minAzimuthangle[airvehicleConfiguration.ID] = payloadconfigList[0].MinAzimuth
-            print("found AirVehicleConfiguration") 
-            
-        elif isinstance(lmcpObject, WeatherReport):
-            print("found WeatherReport")
-            print(lmcpObject.toXMLStr(""))
-            wreport = lmcpObject
-            wspeed = wreport.WindSpeed
-            ditectionTheta = wreport.WindDirection
+            # print("found AirVehicleConfiguration") 
  
         elif isinstance(lmcpObject, HazardZoneDetection):
             hazardDetected = lmcpObject
             detectedLocation = hazardDetected.get_DetectedLocation()
             detectingEntity = hazardDetected.get_DetectingEnitiyID()
-            vid = detectingEntity
-            fireZoneType = hazardDetected.get_DetectedHazardZoneType()
-            #self.__uavsInSarvey[detectingEntity] = True
-            self.__maxSpeedofUAV[detectingEntity] = 18 ## play here
+            print('hazard detected',detectingEntity)
+            # vid = detectingEntity
+            # fireZoneType = hazardDetected.get_DetectedHazardZoneType()
+            # #self.__uavsInSarvey[detectingEntity] = True
+            # self.__maxSpeedofUAV[detectingEntity] = 18 ## play here
             
-            if fireZoneType == HazardType.Fire:
-                self.__uavsInSarvey[detectingEntity] = True
-                if self.__NewSTGoption[vid-1] == 1:
-                    print('found forward',vid)
-                    self.__NewSTGforward[vid-1] = 1
-                elif self.__NewSTGoption[vid-1] == 2:
-                    print('found left',vid)
-                    self.__NewSTGleft[vid-1] = 1
+            # if fireZoneType == HazardType.Fire:
+            #     self.__uavsInSarvey[detectingEntity] = True
+            #     if self.__NewSTGoption[vid-1] == 1:
+            #         print('found forward',vid)
+            #         self.__NewSTGforward[vid-1] = 1
+            #     elif self.__NewSTGoption[vid-1] == 2:
+            #         print('found left',vid)
+            #         self.__NewSTGleft[vid-1] = 1
                     
                     
-                if self.__changeHangle[vid-1]:
-                    self.__changeHangle[vid-1] = False
-                    self.sendGimbleCommand(vid,0,-45)
-                # print('change direction issued')
-                self.__changedirection[detectingEntity] = True
-                self.__gotHint = True
-                self.__lastfireZonelocation[detectingEntity] = detectedLocation
-                self.__insideFireZoneLastTime[detectingEntity] = self.__simulationTimeSeconds
-                if not detectingEntity in self.__uavsisinfirezone:
-                    self.__uavsisinfirezone[detectingEntity] = True
-                [x,y] = self.convertLatLonToxy(detectedLocation.get_Latitude(),detectedLocation.get_Longitude())
-                zid = self.getZoneId([x,y])
-                self.__firezoneHintLocation[zid] = detectedLocation
-                self.__UAVSurvayingZoneId[vid] = zid
-                if not self.__firezonePoints or not zid in self.__firezonePoints:
-                    self.__firezonePoints[zid] = [[x,y]]
-                else:
-                    self.__firezonePoints[zid].append([x,y])
-            elif fireZoneType == HazardType.Smoke:
-                #print('smoke detected')
-                # self.__uavisInsmokeZone[vid] = True
-                # self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__currentHeadingAngleUAV[vid],self.__currentLocationofUAV[vid])
-                pass
+            #     if self.__changeHangle[vid-1]:
+            #         self.__changeHangle[vid-1] = False
+            #         self.sendGimbleCommand(vid,0,-45)
+            #     # print('change direction issued')
+            #     self.__changedirection[detectingEntity] = True
+            #     self.__gotHint = True
+            #     self.__lastfireZonelocation[detectingEntity] = detectedLocation
+            #     self.__insideFireZoneLastTime[detectingEntity] = self.__simulationTimeSeconds
+            #     if not detectingEntity in self.__uavsisinfirezone:
+            #         self.__uavsisinfirezone[detectingEntity] = True
+            #     [x,y] = self.convertLatLonToxy(detectedLocation.get_Latitude(),detectedLocation.get_Longitude())
+            #     zid = self.getZoneId([x,y])
+            #     self.__firezoneHintLocation[zid] = detectedLocation
+            #     self.__UAVSurvayingZoneId[vid] = zid
+            #     if not self.__firezonePoints or not zid in self.__firezonePoints:
+            #         self.__firezonePoints[zid] = [[x,y]]
+            #     else:
+            #         self.__firezonePoints[zid].append([x,y])
+            # elif fireZoneType == HazardType.Smoke:
+            #     #print('smoke detected')
+            #     # self.__uavisInsmokeZone[vid] = True
+            #     # self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__currentHeadingAngleUAV[vid],self.__currentLocationofUAV[vid])
+            #     pass
     
     def sendMissionCommand(self,veicleid,veicleLocation):
         missionCommand = MissionCommand()
@@ -1716,7 +1716,12 @@ class SampleHazardDetector(IDataReceived):
             if i>0 and num%i == 0 and num/i <= i:
                 return i,int(num/i)
                 
-                
+    def getSimTime(self):
+        return self.__simulationTimemilliSeconds
+
+    def getMissionReadyStatus(self):
+        return self.__MissionReady
+
                 
 #################
 ## Main
@@ -1744,6 +1749,11 @@ if __name__ == '__main__':
                 # smpleHazardDetector.updateEstimatedArea()
                 # smpleHazardDetector.setupdateAreaStatus(False)
             # pass
+
+            if smpleHazardDetector.getSimTime() > 0:
+                if smpleHazardDetector.getMissionReadyStatus():
+                    smpleHazardDetector.sendinitialMission()
+
     except KeyboardInterrupt as ki:
         print("Stopping amase tcp client")
     except Exception as ex:
