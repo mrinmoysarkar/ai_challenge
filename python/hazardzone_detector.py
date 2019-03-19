@@ -170,7 +170,7 @@ class SampleHazardDetector(IDataReceived):
         self.__currentVicleState = {}
         self.__simulationTimemilliSeconds = 0
         self.__hazardSensorStatus = {}
-        self.__sensorRefreshrate = 0.2
+        self.__sensorRefreshrate = 1.0
         
     def dataReceived(self, lmcpObject):
         
@@ -185,9 +185,7 @@ class SampleHazardDetector(IDataReceived):
             self.__searchAreaHeight = lmcpObject.Boundary.get_Height()/2.0
             self.calculateGridCoordinateAlt1()
             self.__MissionReady = True
-            print('found keep in zone')
-
-            
+            print('found keep in zone')     
             
         elif isinstance(lmcpObject, AirVehicleState):
             airVehicleState = lmcpObject
@@ -244,8 +242,8 @@ class SampleHazardDetector(IDataReceived):
             detectingEntity = hazardDetected.get_DetectingEnitiyID()
             print('hazard detected',detectingEntity)
             # vid = detectingEntity
-            # fireZoneType = hazardDetected.get_DetectedHazardZoneType()
-            # #self.__uavsInSarvey[detectingEntity] = True
+            fireZoneType = hazardDetected.get_DetectedHazardZoneType()
+            self.__uavsInSarvey[detectingEntity] = True
             # self.__maxSpeedofUAV[detectingEntity] = 18 ## play here
             
             self.__hazardSensorStatus[detectingEntity] = time.time()
@@ -1388,11 +1386,16 @@ class SampleHazardDetector(IDataReceived):
         if not vid in self.__hazardSensorStatus:
             self.__hazardSensorStatus[vid] = 0
         dt = (time.time()-self.__hazardSensorStatus[vid])
-        print(dt)
-        return self.__currentVicleState[vid],  dt < self.__sensorRefreshrate
+        # print(dt)
+        return self.__currentVicleState[vid],  1 if dt < self.__sensorRefreshrate else 0
 
     def getNoOfUAVs(self):
         return self.__noOfUAVs
+
+    def getSurveyStatus(self,vid):
+        if not vid in self.__uavsInSarvey:
+            return False
+        return self.__uavsInSarvey[vid]
                 
 #################
 ## Main
@@ -1414,6 +1417,12 @@ if __name__ == '__main__':
         amaseClient.start()
 
         noOfUAVs = smpleHazardDetector.getNoOfUAVs() + 1
+        dt = 1
+        vState = {}
+        sensorStateFront = {}
+        sensorStateLeft = {}
+        sensorStateRight = {}
+        sensorRotationAngle = 45
         while True:
             #wait for keyboard interrupt
             if smpleHazardDetector.getSendReportStatus():
@@ -1428,11 +1437,52 @@ if __name__ == '__main__':
                 if smpleHazardDetector.getMissionReadyStatus():
                     smpleHazardDetector.sendinitialMission()
 
+                
                 for vid in range(1,noOfUAVs):
-                    vState,sensorState = smpleHazardDetector.getAirVeicleState(vid)
-                    if sensorState:
-                        print(vid,sensorState)
+                    vState[vid],sensorStateFront[vid] = smpleHazardDetector.getAirVeicleState(vid)
+                    smpleHazardDetector.sendGimbleCommand(vid,-sensorRotationAngle,-45)
+                time.sleep(dt)
+                for vid in range(1,noOfUAVs):
+                    vState[vid],sensorStateLeft[vid] = smpleHazardDetector.getAirVeicleState(vid)
+                    smpleHazardDetector.sendGimbleCommand(vid,sensorRotationAngle,-45)
+                time.sleep(dt)
+                for vid in range(1,noOfUAVs):
+                    vState[vid],sensorStateRight[vid] = smpleHazardDetector.getAirVeicleState(vid)
+                    smpleHazardDetector.sendGimbleCommand(vid,0,-45)
+                for vid in range(1,noOfUAVs):
+                    if smpleHazardDetector.getSurveyStatus(vid):
+                        if not sensorStateLeft[vid] and not sensorStateFront[vid] and not sensorStateRight[vid]:
+                            print('hard left')
+                            headingangle = (vState[vid].Heading - 90)
+                            headingangle = headingangle if headingangle>0 else headingangle+360
+                            smpleHazardDetector.sendHeadingAngleCommandwithcurrentlocation(vid,headingangle,vState[vid].Location)
+                        elif (sensorStateLeft[vid] and sensorStateFront[vid] and not sensorStateRight[vid]):
+                            print('soft right')
+                            headingangle = (vState[vid].Heading + 45) % 360
+                            smpleHazardDetector.sendHeadingAngleCommandwithcurrentlocation(vid,headingangle,vState[vid].Location)
+                        elif (not sensorStateLeft[vid] and sensorStateFront[vid] and not sensorStateRight[vid]):
+                            print('right')
+                            headingangle = (vState[vid].Heading + 90) % 360
+                            smpleHazardDetector.sendHeadingAngleCommandwithcurrentlocation(vid,headingangle,vState[vid].Location)
+                        elif sensorStateLeft[vid] and sensorStateFront[vid] and sensorStateRight[vid]:
+                            print('hard right')
+                            headingangle = (vState[vid].Heading + 135) % 360
+                            smpleHazardDetector.sendHeadingAngleCommandwithcurrentlocation(vid,headingangle,vState[vid].Location)
+                        else:
+                            print('straight')
 
+                time.sleep(3*dt)
+
+                    # if sensorState:
+                    #     print(vid,sensorState)
+                    #     smpleHazardDetector.sendGimbleCommand(vid,-45,-45)
+                    #     time.sleep(0.5)
+                    #     vState,sensorState = smpleHazardDetector.getAirVeicleState(vid)
+                    #     if sensorState:
+                    #         smpleHazardDetector.sendGimbleCommand(vid,0,-45)
+                    #         headingangle = (vState.Heading + 45) % 360
+                    #         smpleHazardDetector.sendHeadingAngleCommandwithcurrentlocation(vid,headingangle,vState.Location)
+            # time.sleep(0.1)
     except KeyboardInterrupt as ki:
         print("Stopping amase tcp client")
     except Exception as ex:
