@@ -48,8 +48,8 @@
 
 
 
-w = 100
-h = 100
+# w = 100
+# h = 100
 
 # wSeg = 2
 # hSeg = 2
@@ -79,10 +79,13 @@ h = 100
 #     currCentery = -h/2
 
 
-if not 0:
-    print('zero')
-if not 1:
-    print('one')
+# if not 0:
+#     print('zero')
+# if not 1:
+#     print('one')
+
+x=[1,1,1,3,4,4,4]
+print(x.count(max(x)))
 
 
 

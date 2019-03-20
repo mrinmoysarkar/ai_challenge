@@ -1,123 +1,120 @@
-# def getAltitudeLatLon(self,lat,lon):
-        # row = int(round((lat - self.__latBias)*self.__delAlevation))
-        # col = int(round((lon - self.__lonBias)*self.__delAlevation))
-        # sz = self.__altidata.shape
-        # if row >= sz[0]:
-            # row = sz[0]-1
-        # if col >= sz[1]:
-            # col = sz[1]-1
-        # # print(self.__altidata[row][col])
-        # return self.__altidata[row][col]
+def getAltitudeLatLon(self,lat,lon):
+        row = int(round((lat - self.__latBias)*self.__delAlevation))
+        col = int(round((lon - self.__lonBias)*self.__delAlevation))
+        sz = self.__altidata.shape
+        if row >= sz[0]:
+            row = sz[0]-1
+        if col >= sz[1]:
+            col = sz[1]-1
+        # print(self.__altidata[row][col])
+        return self.__altidata[row][col]
     
-    # def getAltitude(self,location):
-        # row = int(round((location.get_Latitude() - self.__latBias)*self.__delAlevation))
-        # col = int(round((location.get_Longitude() - self.__lonBias)*self.__delAlevation))
-        # sz = self.__altidata.shape
-        # # print(sz)
-        # if row >= sz[0]:
-            # row = sz[0]-1
-        # if col >= sz[1]:
-            # col = sz[1]-1
-        # # print(self.__altidata[row][col])
-        # return self.__altidata[row][col]
-		
-		
-		
-    # def turn(self,veicleid,left):
-        # delang = 15
-        # if left == 0:
-            # if self.__currentHeadingAngleUAV[veicleid] < delang:
-                # self.__currentHeadingAngleUAV[veicleid] = 360 - delang
-            # else:
-                # self.__currentHeadingAngleUAV[veicleid] -= delang
-        # elif left == 1:
-            # self.__currentHeadingAngleUAV[veicleid] = (self.__currentHeadingAngleUAV[veicleid]+delang)%360
-        # self.sendHeadingAngleCommand(veicleid,self.__currentHeadingAngleUAV[veicleid])
+def getAltitude(self,location):
+    row = int(round((location.get_Latitude() - self.__latBias)*self.__delAlevation))
+    col = int(round((location.get_Longitude() - self.__lonBias)*self.__delAlevation))
+    sz = self.__altidata.shape
+    # print(sz)
+    if row >= sz[0]:
+        row = sz[0]-1
+    if col >= sz[1]:
+        col = sz[1]-1
+    # print(self.__altidata[row][col])
+    return self.__altidata[row][col]
+						
+def turn(self,veicleid,left):
+    delang = 15
+    if left == 0:
+        if self.__currentHeadingAngleUAV[veicleid] < delang:
+            self.__currentHeadingAngleUAV[veicleid] = 360 - delang
+        else:
+            self.__currentHeadingAngleUAV[veicleid] -= delang
+    elif left == 1:
+        self.__currentHeadingAngleUAV[veicleid] = (self.__currentHeadingAngleUAV[veicleid]+delang)%360
+    self.sendHeadingAngleCommand(veicleid,self.__currentHeadingAngleUAV[veicleid])
         
-    # def turn(self,veicleid):
-        # headingAngle = 0
-        # if veicleid == 1:
-            # if self.__currentHeadingAngleUAV[veicleid] == 0:
-                # self.__currentHeadingAngleUAV[veicleid] = 1
-                # if self.__keepoutOption[veicleid-1] == 0:
-                    # headingAngle = 90
-                # else:
-                    # headingAngle = 270
-            # elif self.__currentHeadingAngleUAV[veicleid] == 1:
-                # self.__currentHeadingAngleUAV[veicleid] = 2
-                # headingAngle = 180
-            # elif self.__currentHeadingAngleUAV[veicleid] == 2:
-                # self.__currentHeadingAngleUAV[veicleid] = 3
-                # if self.__keepoutOption[veicleid-1] == 0:
-                    # headingAngle = 90
-                # else:
-                    # headingAngle = 270
-            # elif self.__currentHeadingAngleUAV[veicleid] == 3:
-                # self.__currentHeadingAngleUAV[veicleid] = 0
-                # headingAngle = 0
-        # elif veicleid  == 2 :
-            # if self.__currentHeadingAngleUAV[veicleid] == 0:
-                # self.__currentHeadingAngleUAV[veicleid] = 1
-                # if self.__keepoutOption[veicleid-1] == 0:
-                    # headingAngle = 270
-                # else:
-                    # headingAngle = 90
-            # elif self.__currentHeadingAngleUAV[veicleid] == 1:
-                # self.__currentHeadingAngleUAV[veicleid] = 2
-                # headingAngle = 180
-            # elif self.__currentHeadingAngleUAV[veicleid] == 2:
-                # self.__currentHeadingAngleUAV[veicleid] = 3
-                # if self.__keepoutOption[veicleid-1] == 0:
-                    # headingAngle = 270
-                # else:
-                    # headingAngle = 90
-            # elif self.__currentHeadingAngleUAV[veicleid] == 3:
-                # self.__currentHeadingAngleUAV[veicleid] = 0
-                # headingAngle = 0
-        # elif veicleid == 3:
-            # if self.__currentHeadingAngleUAV[veicleid] == 0:
-                # self.__currentHeadingAngleUAV[veicleid] = 1
-                # if self.__keepoutOption[veicleid-1] == 0:
-                    # headingAngle = 180
-                # else:
-                    # headingAngle = 0
-            # elif self.__currentHeadingAngleUAV[veicleid] == 1:
-                # self.__currentHeadingAngleUAV[veicleid] = 2
-                # headingAngle = 270
-            # elif self.__currentHeadingAngleUAV[veicleid] == 2:
-                # self.__currentHeadingAngleUAV[veicleid] = 3
-                # if self.__keepoutOption[veicleid-1] == 0:
-                    # headingAngle = 180
-                # else:
-                    # headingAngle = 0
-            # elif self.__currentHeadingAngleUAV[veicleid] == 3:
-                # self.__currentHeadingAngleUAV[veicleid] = 0
-                # headingAngle = 90
-        # elif veicleid == 4:
-            # if self.__currentHeadingAngleUAV[veicleid] == 0:
-                # self.__currentHeadingAngleUAV[veicleid] = 1
-                # if self.__keepoutOption[veicleid-1] == 0:
-                    # headingAngle = 0
-                # else:
-                    # headingAngle = 180
-            # elif self.__currentHeadingAngleUAV[veicleid] == 1:
-                # self.__currentHeadingAngleUAV[veicleid] = 2
-                # headingAngle = 270
-            # elif self.__currentHeadingAngleUAV[veicleid] == 2:
-                # self.__currentHeadingAngleUAV[veicleid] = 3
-                # if self.__keepoutOption[veicleid-1] == 0:
-                    # headingAngle = 0
-                # else:
-                    # headingAngle = 180
-            # elif self.__currentHeadingAngleUAV[veicleid] == 3:
-                # self.__currentHeadingAngleUAV[veicleid] = 0
-                # headingAngle = 90
-        
+def turn(self,veicleid):
+    headingAngle = 0
+    if veicleid == 1:
+        if self.__currentHeadingAngleUAV[veicleid] == 0:
+            self.__currentHeadingAngleUAV[veicleid] = 1
+            if self.__keepoutOption[veicleid-1] == 0:
+                headingAngle = 90
+            else:
+                headingAngle = 270
+        elif self.__currentHeadingAngleUAV[veicleid] == 1:
+            self.__currentHeadingAngleUAV[veicleid] = 2
+            headingAngle = 180
+        elif self.__currentHeadingAngleUAV[veicleid] == 2:
+            self.__currentHeadingAngleUAV[veicleid] = 3
+            if self.__keepoutOption[veicleid-1] == 0:
+                headingAngle = 90
+            else:
+                headingAngle = 270
+        elif self.__currentHeadingAngleUAV[veicleid] == 3:
+            self.__currentHeadingAngleUAV[veicleid] = 0
+            headingAngle = 0
+    elif veicleid  == 2 :
+        if self.__currentHeadingAngleUAV[veicleid] == 0:
+            self.__currentHeadingAngleUAV[veicleid] = 1
+            if self.__keepoutOption[veicleid-1] == 0:
+                headingAngle = 270
+            else:
+                headingAngle = 90
+        elif self.__currentHeadingAngleUAV[veicleid] == 1:
+            self.__currentHeadingAngleUAV[veicleid] = 2
+            headingAngle = 180
+        elif self.__currentHeadingAngleUAV[veicleid] == 2:
+            self.__currentHeadingAngleUAV[veicleid] = 3
+            if self.__keepoutOption[veicleid-1] == 0:
+                headingAngle = 270
+            else:
+                headingAngle = 90
+        elif self.__currentHeadingAngleUAV[veicleid] == 3:
+            self.__currentHeadingAngleUAV[veicleid] = 0
+            headingAngle = 0
+    elif veicleid == 3:
+        if self.__currentHeadingAngleUAV[veicleid] == 0:
+            self.__currentHeadingAngleUAV[veicleid] = 1
+            if self.__keepoutOption[veicleid-1] == 0:
+                headingAngle = 180
+            else:
+                headingAngle = 0
+        elif self.__currentHeadingAngleUAV[veicleid] == 1:
+            self.__currentHeadingAngleUAV[veicleid] = 2
+            headingAngle = 270
+        elif self.__currentHeadingAngleUAV[veicleid] == 2:
+            self.__currentHeadingAngleUAV[veicleid] = 3
+            if self.__keepoutOption[veicleid-1] == 0:
+                headingAngle = 180
+            else:
+                headingAngle = 0
+        elif self.__currentHeadingAngleUAV[veicleid] == 3:
+            self.__currentHeadingAngleUAV[veicleid] = 0
+            headingAngle = 90
+    elif veicleid == 4:
+        if self.__currentHeadingAngleUAV[veicleid] == 0:
+            self.__currentHeadingAngleUAV[veicleid] = 1
+            if self.__keepoutOption[veicleid-1] == 0:
+                headingAngle = 0
+            else:
+                headingAngle = 180
+        elif self.__currentHeadingAngleUAV[veicleid] == 1:
+            self.__currentHeadingAngleUAV[veicleid] = 2
+            headingAngle = 270
+        elif self.__currentHeadingAngleUAV[veicleid] == 2:
+            self.__currentHeadingAngleUAV[veicleid] = 3
+            if self.__keepoutOption[veicleid-1] == 0:
+                headingAngle = 0
+            else:
+                headingAngle = 180
+        elif self.__currentHeadingAngleUAV[veicleid] == 3:
+            self.__currentHeadingAngleUAV[veicleid] = 0
+            headingAngle = 90
+    
 
-        # print('turning',veicleid,' heading', headingAngle)
-        # self.sendHeadingAngleCommand(veicleid,headingAngle)
-        
-        
+    print('turning',veicleid,' heading', headingAngle)
+    self.sendHeadingAngleCommand(veicleid,headingAngle)
+                
 def isLeft(self,location,center):
         R = 111000
         a = location.get_Latitude() - center.get_Latitude()
@@ -132,8 +129,6 @@ def isLeft(self,location,center):
             return True
         elif a > 0 and b < 0:
             return False
-
-
 
 def getFourcenter(self,arbitararyCenter): # have to work
     zid = 0
@@ -476,3 +471,92 @@ def calculateGridCoordinateAlt(self):
     zlocation.set_Altitude(450)
     self.__zoneCenter[4] = zlocation
     self.__zoneboundaryPoints[4] = [[0,0],[a,-a],[0,-a],[a,0]]
+
+def getNextLoiterCenter(self,veicleid,refLocation):
+        if veicleid == 2:
+            [xr,yr] = self.convertLatLonToxy(refLocation.get_Latitude(),refLocation.get_Longitude())
+            x = xr + (self.__searchAreaWidth-abs(xr))/2
+            [lat,lon] = self.convertxyToLatLon(x,yr)
+            location = Location3D()
+            location.set_Latitude(lat)
+            location.set_Longitude(lon)
+            location.set_Altitude(refLocation.get_Altitude())
+            return location
+        elif veicleid == 3:
+            [xr,yr] = self.convertLatLonToxy(refLocation.get_Latitude(),refLocation.get_Longitude())
+            y = yr - (self.__searchAreaHeight-abs(yr))/2
+            [lat,lon] = self.convertxyToLatLon(xr,y)
+            location = Location3D()
+            location.set_Latitude(lat)
+            location.set_Longitude(lon)
+            location.set_Altitude(refLocation.get_Altitude())
+            return location
+        if veicleid == 4:
+            [xr,yr] = self.convertLatLonToxy(refLocation.get_Latitude(),refLocation.get_Longitude())
+            y = yr + (self.__searchAreaHeight-abs(yr))/2
+            [lat,lon] = self.convertxyToLatLon(xr,y)
+            location = Location3D()
+            location.set_Latitude(lat)
+            location.set_Longitude(lon)
+            location.set_Altitude(refLocation.get_Altitude())
+            return location
+        return refLocation
+
+def isLeavingFireZone(self,veicleid,location):
+    if self.__lastfireZonelocation:
+        if veicleid in self.__lastfireZonelocation:
+            lastFireLocation =  self.__lastfireZonelocation[veicleid]
+            lastFireLocationXY = self.convertLatLonToxy(lastFireLocation.get_Latitude(),lastFireLocation.get_Longitude())
+            locationXY = self.convertLatLonToxy(location.get_Latitude(),location.get_Longitude())
+            d = (locationXY[0] - lastFireLocationXY[0])**2 + (locationXY[1] - lastFireLocationXY[1])**2
+            if d > 250000:
+                return True
+        
+    return False
+
+def getBetweenLatLonwithoutVID(self,xs,ys,xe,ye,startwaypointId,connectingwaypointId):
+    delx = xe-xs
+    dely = ye-ys
+    d = delx**2 + dely**2
+    m = dely/delx
+    ii = int(round(sqrt(d)/500))
+    delx /= ii
+    ii = ii - 1
+    x = xs
+    waypointNumber = startwaypointId+1
+    waypoints = []
+    x += delx
+    for i in range(ii):
+        y = ys + (x-xs)*m + 300
+        [lat,lon] = self.convertxyToLatLon(x,y)
+        x += delx
+        waypoint = Waypoint()
+        waypoint.set_Latitude(lat)
+        waypoint.set_Longitude(lon)
+        alti = self.getAltitudeLatLon(lat,lon) 
+        if alti < self.__normalSearchAltitude:
+            waypoint.set_Altitude(self.__normalSearchAltitude)
+        else:
+            waypoint.set_Altitude(alti + self.__safeHeight)
+        waypoint.set_AltitudeType(AltitudeType.MSL)
+        waypoint.set_Number(waypointNumber)
+        if i == ii-1:
+            waypoint.set_NextWaypoint(connectingwaypointId)
+        else:
+            waypoint.set_NextWaypoint(waypointNumber+1)
+        waypoint.set_Speed(35)
+        waypoint.set_SpeedType(SpeedType.Airspeed)
+        waypoint.set_ClimbRate(15)
+        waypoint.set_TurnType(TurnType.TurnShort)
+        waypoint.set_ContingencyWaypointA(0)
+        waypoint.set_ContingencyWaypointB(0)
+        waypoints.append(waypoint)
+        waypointNumber += 1
+    
+    return waypoints
+
+
+elif isinstance(lmcpObject, EntityState):
+            self.__currentEntityState[lmcpObject.ID] = lmcpObject
+            print(self.__currentEntityState)
+            print('entity state')
