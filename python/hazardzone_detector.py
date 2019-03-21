@@ -45,6 +45,7 @@ from afrl.cmasi.EntityState import EntityState
 from afrl.cmasi.searchai.RecoveryPoint import RecoveryPoint
 from afrl.cmasi.perceive.EntityPerception import EntityPerception
 from afrl.cmasi.RemoveEntities import RemoveEntities
+from afrl.cmasi.GimbalScanAction import GimbalScanAction
 import time
 # import utm
 
@@ -258,7 +259,8 @@ class SampleHazardDetector(IDataReceived):
             payloadconfigList = airvehicleConfiguration.PayloadConfigurationList
             self.__maxAzimuthangle[airvehicleConfiguration.ID] = payloadconfigList[0].MaxAzimuth
             self.__minAzimuthangle[airvehicleConfiguration.ID] = payloadconfigList[0].MinAzimuth
-            self.__airvehicleConfigList.append(lmcpObject)
+            self.__airvehicleConfigList.append(airvehicleConfiguration)
+            self.sendGimbleScanCommand(airvehicleConfiguration.ID,airvehicleConfiguration.PayloadConfigurationList[0].MaxAzimuthSlewRate)
              
  
         elif isinstance(lmcpObject, EntityConfiguration):
@@ -270,12 +272,13 @@ class SampleHazardDetector(IDataReceived):
             detectingEntity = hazardDetected.get_DetectingEnitiyID()
             # vid = detectingEntity
             fireZoneType = hazardDetected.get_DetectedHazardZoneType()
-            self.__uavsInSarvey[detectingEntity] = True
+            
             # self.__maxSpeedofUAV[detectingEntity] = 18 ## play here
             
             self.__hazardSensorStatus[detectingEntity] = time.time()
 
             if fireZoneType == HazardType.Fire:
+                self.__uavsInSarvey[detectingEntity] = True
             #     self.__uavsInSarvey[detectingEntity] = True
             #     if self.__NewSTGoption[vid-1] == 1:
             #         print('found forward',vid)
@@ -416,6 +419,27 @@ class SampleHazardDetector(IDataReceived):
         gimbleAngleAction.set_Rotation(0)
         
         vehicleActionCommand.get_VehicleActionList().append(gimbleAngleAction)
+        
+        self.__client.sendLMCPObject(vehicleActionCommand)
+
+    def sendGimbleScanCommand(self,veicleid,slewRate):
+        #Setting up the mission to send to the UAV
+        vehicleActionCommand = VehicleActionCommand()
+        vehicleActionCommand.set_VehicleID(veicleid)
+        vehicleActionCommand.set_Status(CommandStatusType.Pending)
+        vehicleActionCommand.set_CommandID(1)
+         
+        
+        gimbalScanAction = GimbalScanAction()
+        gimbalScanAction.set_PayloadID(1)
+        gimbalScanAction.set_AzimuthSlewRate(60)
+        gimbalScanAction.set_StartAzimuth(90)
+        gimbalScanAction.set_EndAzimuth(-90)
+        gimbalScanAction.set_ElevationSlewRate(10)
+        gimbalScanAction.set_StartElevation(-45)
+        gimbalScanAction.set_EndElevation(-45)
+        
+        vehicleActionCommand.get_VehicleActionList().append(gimbalScanAction)
         
         self.__client.sendLMCPObject(vehicleActionCommand)
         
@@ -719,6 +743,9 @@ class SampleHazardDetector(IDataReceived):
         
     def sendServeyCommand(self,vstate):
         [xc,yc] = self.convertLatLonToxy(vstate.Location.Latitude,vstate.Location.Longitude)
+        # headingangle = (vstate.Heading + 180)%360
+        # self.sendHeadingAngleCommandwithcurrentlocation(vstate.ID,headingangle,vstate.Location)
+        # time.sleep(15)
         r = 1000
         points = self.GenerateSamplePointsOnACircleforSurvey(xc,yc,r,vstate.Heading)
         vid = vstate.ID
@@ -795,6 +822,7 @@ class SampleHazardDetector(IDataReceived):
         # yc = yc - r*sin(radians(90-headingangle))
         # headingangle += 90
         Points = []
+        Points.append([xc,yc])
         StepSize = 45
         Np = round(360/StepSize)
         for i in range(Np):
@@ -1480,13 +1508,23 @@ if __name__ == '__main__':
                     # vstate,_ = smpleHazardDetector.getAirVeicleState(1)
                     # smpleHazardDetector.sendServeyCommand(vstate)
 
-                for uav in smpleHazardDetector.getAirveicleConfigList():
+                uavlist = smpleHazardDetector.getAirveicleConfigList()
+                # for uav in uavlist:
+                #     smpleHazardDetector.sendGimbleCommand(uav.ID,-45,-45)
+                # time.sleep(dt)
+                # for uav in uavlist:
+                #     smpleHazardDetector.sendGimbleCommand(uav.ID,45,-45)
+                # time.sleep(dt)
+                # for uav in uavlist:
+                #     smpleHazardDetector.sendGimbleCommand(uav.ID,0,-45)
+                # time.sleep(dt)
+                for uav in uavlist:
                     vstate,_ = smpleHazardDetector.getAirVeicleState(uav.ID)
                     if smpleHazardDetector.getSurveyStatus(uav.ID):
                         if not uav.ID in sensorState:
                             smpleHazardDetector.sendServeyCommand(vstate)
                             sensorState[uav.ID] = 1
-                        elif vstate.Mode == NavigationMode.Waypoint and vstate.CurrentWaypoint > 1:
+                        elif vstate.Mode == NavigationMode.Waypoint and vstate.CurrentWaypoint > 2:
                             smpleHazardDetector.sendServeyCommand(vstate)
 
                     smpleHazardDetector.setSurveyStatus(uav.ID,False)
