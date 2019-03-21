@@ -84,11 +84,26 @@
 # if not 1:
 #     print('one')
 
-x=[1,1,1,3,4,4,4]
-print(x.count(max(x)))
+# x=[1,1,1,3,4,4,4]
+# print(x.count(max(x)))
 
 
+import matplotlib.pyplot as plt
+from math import atan2,cos,sin,radians,degrees
 
+
+x = 4
+y = 5
+
+theta = atan2(y,x)
+print(theta)
+
+d = 10
+
+xc = x + d*cos(radians(90-degrees(theta)))
+yc = y - d*sin(radians(90-degrees(theta)))
+
+plt.scatter([x,xc],[y,yc])
 
 
 

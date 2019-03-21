@@ -44,6 +44,7 @@ from afrl.cmasi.EntityConfiguration import EntityConfiguration
 from afrl.cmasi.EntityState import EntityState
 from afrl.cmasi.searchai.RecoveryPoint import RecoveryPoint
 from afrl.cmasi.perceive.EntityPerception import EntityPerception
+from afrl.cmasi.RemoveEntities import RemoveEntities
 import time
 # import utm
 
@@ -243,6 +244,14 @@ class SampleHazardDetector(IDataReceived):
             # print('entity perception')
             pass
 
+        elif isinstance(lmcpObject, RemoveEntities):
+            # print('entity removed', lmcpObject.EntityList[0], len(self.__airvehicleConfigList))
+            for airVehicleConfig in self.__airvehicleConfigList:
+                if airVehicleConfig.ID == lmcpObject.EntityList[0]:
+                    self.__airvehicleConfigList.remove(airVehicleConfig)
+                    break
+            # print('entity removed', lmcpObject.EntityList[0], len(self.__airvehicleConfigList))
+
         elif isinstance(lmcpObject, AirVehicleConfiguration):
             airvehicleConfiguration = lmcpObject
             self.__maxSpeedofUAV[airvehicleConfiguration.ID] = airvehicleConfiguration.get_MaximumSpeed()
@@ -250,7 +259,7 @@ class SampleHazardDetector(IDataReceived):
             self.__maxAzimuthangle[airvehicleConfiguration.ID] = payloadconfigList[0].MaxAzimuth
             self.__minAzimuthangle[airvehicleConfiguration.ID] = payloadconfigList[0].MinAzimuth
             self.__airvehicleConfigList.append(lmcpObject)
-            # print("found AirVehicleConfiguration") 
+             
  
         elif isinstance(lmcpObject, EntityConfiguration):
             self.__entityConfigList.append(lmcpObject)
@@ -259,7 +268,6 @@ class SampleHazardDetector(IDataReceived):
             hazardDetected = lmcpObject
             detectedLocation = hazardDetected.get_DetectedLocation()
             detectingEntity = hazardDetected.get_DetectingEnitiyID()
-            print('hazard detected',detectingEntity)
             # vid = detectingEntity
             fireZoneType = hazardDetected.get_DetectedHazardZoneType()
             self.__uavsInSarvey[detectingEntity] = True
@@ -456,8 +464,7 @@ class SampleHazardDetector(IDataReceived):
         zi = 0
         for id in self.__maxSpeedofUAV.keys():
             if self.__maxSpeedofUAV[id] == maxSpeed:
-                
-                self.sendGimbleCommand(id,0,-75)
+                # self.sendGimbleCommand(id,0,-75)
                 self.sendMissionCommand(id,self.__initLocationOfUAVs[id])
                 self.__uavsInMission[id] = True
                 self.__uavsInSearch[id] = True
@@ -710,6 +717,52 @@ class SampleHazardDetector(IDataReceived):
                 self.__LastheadingAngleSendtime[veicleid-1] = self.__simulationTimeSeconds
                 self.sendHeadingAngleCommandwithcurrentlocation(veicleid,self.__desiredheading[veicleid-1],veicleLocation)
         
+    def sendServeyCommand(self,vstate):
+        [xc,yc] = self.convertLatLonToxy(vstate.Location.Latitude,vstate.Location.Longitude)
+        r = 1000
+        points = self.GenerateSamplePointsOnACircleforSurvey(xc,yc,r,vstate.Heading)
+        vid = vstate.ID
+        missionCommand = MissionCommand()
+        missionCommand.set_FirstWaypoint(1)
+        missionCommand.set_VehicleID(vid)
+        missionCommand.set_Status(CommandStatusType.Pending)
+        missionCommand.set_CommandID(1)
+        for i in range(1,len(points)+1):
+            p = points[i-1]
+            x = p[0]
+            y = p[1]
+            [lat,lon] = self.convertxyToLatLon(x,y)
+            waypoint = Waypoint()
+            waypoint.set_Latitude(lat)
+            waypoint.set_Longitude(lon)
+            alti = self.getAltitudeLatLon(lat,lon) 
+            if alti < self.__normalSearchAltitude:
+                waypoint.set_Altitude(self.__normalSearchAltitude)
+            else:
+                waypoint.set_Altitude(alti + self.__safeHeight)
+            waypoint.set_AltitudeType(AltitudeType.MSL)
+            waypoint.set_Number(i)
+            if i == len(points):
+                waypoint.set_NextWaypoint(1)
+            else:
+                waypoint.set_NextWaypoint(i+1)
+            waypoint.set_Speed(self.__maxSpeedofUAV[vid])
+            waypoint.set_SpeedType(SpeedType.Airspeed)
+            waypoint.set_ClimbRate(0)
+            waypoint.set_TurnType(TurnType.TurnShort)
+            waypoint.set_ContingencyWaypointA(0)
+            waypoint.set_ContingencyWaypointB(0)
+            missionCommand.get_WaypointList().append(waypoint)
+            
+        
+        
+        # self.__visitedTotalwaypoints[vid-1] = 0
+        # self.__previouswaypointNo[vid] = 1
+        
+          
+        # self.__totalWaypointsassignedToUAV[vid] = i
+        self.__client.sendLMCPObject(missionCommand)
+
     def convertLatLonToxy(self,lat,long):
         R = 111000
         a = lat-self.__searchAreaCenterLat
@@ -737,6 +790,23 @@ class SampleHazardDetector(IDataReceived):
             Points.append([Cx,Cy])
         return Points
     
+    def GenerateSamplePointsOnACircleforSurvey(self,xc,yc,r,headingangle):
+        # xc = xc + r*cos(radians(90-headingangle))
+        # yc = yc - r*sin(radians(90-headingangle))
+        # headingangle += 90
+        Points = []
+        StepSize = 45
+        Np = round(360/StepSize)
+        for i in range(Np):
+            angle = (headingangle+180)%360 - i * StepSize
+            angle = angle if angle >= 0 else angle + 360
+            xi = r * cos(radians(angle))
+            yi = r * sin(radians(angle))
+            Cx = xc + xi
+            Cy = yc + yi
+            Points.append([Cx,Cy])
+        return Points
+
     def calculateGridCoordinate(self):
         self.__MissionReady = True
         self.__zoneCenter = {}
@@ -1356,7 +1426,15 @@ class SampleHazardDetector(IDataReceived):
         if not vid in self.__uavsInSarvey:
             return False
         return self.__uavsInSarvey[vid]
-                
+    
+    def setSurveyStatus(self,vid,status):
+        self.__uavsInSarvey[vid] = status
+
+    def getAirveicleConfigList(self):
+        return self.__airvehicleConfigList
+
+
+
 #################
 ## Main
 #################
@@ -1379,6 +1457,7 @@ if __name__ == '__main__':
         noOfUAVs = smpleHazardDetector.getNoOfUAVs() + 1
         dt = 1
         vState = {}
+        sensorState = {}
         sensorStateFront = {}
         sensorStateLeft = {}
         sensorStateRight = {}
@@ -1398,7 +1477,19 @@ if __name__ == '__main__':
                 if not smpleHazardDetector.getMissionReadyStatus():
                     smpleHazardDetector.calculateGridCoordinate()
                     smpleHazardDetector.sendinitialMission()
-                
+                    # vstate,_ = smpleHazardDetector.getAirVeicleState(1)
+                    # smpleHazardDetector.sendServeyCommand(vstate)
+
+                for uav in smpleHazardDetector.getAirveicleConfigList():
+                    vstate,_ = smpleHazardDetector.getAirVeicleState(uav.ID)
+                    if smpleHazardDetector.getSurveyStatus(uav.ID):
+                        if not uav.ID in sensorState:
+                            smpleHazardDetector.sendServeyCommand(vstate)
+                            sensorState[uav.ID] = 1
+                        elif vstate.Mode == NavigationMode.Waypoint and vstate.CurrentWaypoint > 1:
+                            smpleHazardDetector.sendServeyCommand(vstate)
+
+                    smpleHazardDetector.setSurveyStatus(uav.ID,False)
 
                 
                 # for vid in range(1,noOfUAVs):
