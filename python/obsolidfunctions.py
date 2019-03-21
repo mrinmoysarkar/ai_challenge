@@ -560,3 +560,197 @@ elif isinstance(lmcpObject, EntityState):
             self.__currentEntityState[lmcpObject.ID] = lmcpObject
             print(self.__currentEntityState)
             print('entity state')
+
+self.__timethreshold = [1.3,2.5]
+
+####experimental
+        self.__NewSTGt1 = [0,0,0,0,0,0,0,0]
+        self.__NewSTGt2 = [0,0,0,0,0,0,0,0]
+        self.__NewSTGt3 = [0,0,0,0,0,0,0,0]
+        self.__NewSTGt4 = [0,0,0,0,0,0,0,0]
+        self.__NewSTGoption = [0,0,0,0,0,0,0,0]
+        self.__NewSTGdt = [2,2,2,2,2,2,2,2]
+        self.__NewSTGleft = [0,0,0,0,0,0,0,0]
+        self.__NewSTGforward = [0,0,0,0,0,0,0,0]
+        self.__NewSTGdtaction = [5,5,5,5,5,5,5,5]
+        self.__NewSTGheadingangle = [0,0,0,0,0,0,0,0]
+        self.__NewSTGfirst = [0,0,0,0,0,0,0,0]
+        self.__NewSTGrefHeading = [0,0,0,0,0,0,0,0]
+
+def surveyNewStrategy(self,airVehicleState):
+    vid = airVehicleState.ID
+    currentlocation = airVehicleState.Location
+    leftstg = self.__veicleStrategiId[vid-1]
+    print("survey new strategy", vid)
+    if leftstg == 0:#left
+        if self.__NewSTGfirst[vid-1] == 0:
+            self.__NewSTGfirst[vid-1] = 1
+            self.__NewSTGrefHeading[vid-1] = airVehicleState.Heading
+            self.__NewSTGheadingangle[vid-1] = (airVehicleState.Heading + 90)%360
+            self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__NewSTGheadingangle[vid-1],currentlocation)
+        else:
+            headingangleError = abs(self.__NewSTGheadingangle[vid-1]-airVehicleState.Heading)
+            headingangleError = headingangleError if headingangleError < 180 else (360-headingangleError)
+            print("survey new strategy left", vid, headingangleError)
+            if headingangleError < 15:
+                if self.__NewSTGoption[vid-1] == 0 and (self.__simulationTimeSeconds-self.__NewSTGt3[vid-1]) > self.__NewSTGdt[vid-1]:
+                    print('#look forward',vid)
+                    self.__NewSTGforward[vid-1] = 0
+                    self.sendGimbleCommand(vid,0,-45)
+                    self.__NewSTGoption[vid-1] = 1
+                    self.__NewSTGt1[vid-1] = self.__simulationTimeSeconds
+                elif self.__NewSTGoption[vid-1] == 1 and (self.__simulationTimeSeconds-self.__NewSTGt1[vid-1]) > self.__NewSTGdt[vid-1]:
+                    print('#look left',vid)
+                    if self.__NewSTGforward[vid-1] == 0:
+                        self.__NewSTGforward[vid-1] = 2
+                    self.__NewSTGleft[vid-1] = 0
+                    self.sendGimbleCommand(vid,-90,-45)
+                    self.__NewSTGoption[vid-1] = 2
+                    self.__NewSTGt2[vid-1] = self.__simulationTimeSeconds
+                elif self.__NewSTGoption[vid-1] == 2 and (self.__simulationTimeSeconds-self.__NewSTGt2[vid-1]) > self.__NewSTGdt[vid-1]:
+                    print('# take action',vid)
+                    if self.__NewSTGleft[vid-1] == 0:
+                        self.__NewSTGleft[vid-1] = 2
+                    self.sendGimbleCommand(vid,0,-45)
+                    self.__NewSTGoption[vid-1] = 0
+                    self.__NewSTGt3[vid-1] = self.__simulationTimeSeconds
+                    
+                    if self.__NewSTGleft[vid-1] == 1 and self.__NewSTGforward[vid-1] == 1:
+                        print('#take right',vid)
+                        self.__NewSTGheadingangle[vid-1] = (airVehicleState.Heading + 90)%360
+                        self.__NewSTGdtaction[vid-1] = 7
+                        self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__NewSTGheadingangle[vid-1],currentlocation)
+                      
+                    elif self.__NewSTGleft[vid-1] == 1 and self.__NewSTGforward[vid-1] == 2:
+                        print('#go straignt',vid)
+                        self.__NewSTGheadingangle[vid-1] = airVehicleState.Heading
+                        self.__NewSTGdtaction[vid-1] = 7
+                        
+                    elif self.__NewSTGleft[vid-1] == 2 and self.__NewSTGforward[vid-1] == 1:
+                        print('#take hard right',vid)
+                        self.__NewSTGheadingangle[vid-1] = (airVehicleState.Heading + 135)%360
+                        self.__NewSTGdtaction[vid-1] = 7
+                        self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__NewSTGheadingangle[vid-1],currentlocation)
+                           
+                    elif self.__NewSTGleft[vid-1] == 2 and self.__NewSTGforward[vid-1] == 2:
+                        print('# take hard left',vid)
+                        self.__NewSTGheadingangle[vid-1] = (airVehicleState.Heading - 30)
+                        self.__NewSTGheadingangle[vid-1] = self.__NewSTGheadingangle[vid-1] if self.__NewSTGheadingangle[vid-1] >= 0 else (self.__NewSTGheadingangle[vid-1] + 360)
+                        self.__NewSTGdtaction[vid-1] = 10
+                        self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__NewSTGheadingangle[vid-1],currentlocation)
+                    
+            if (self.__simulationTimeSeconds - self.__NewSTGt3[vid-1]) > self.__NewSTGdtaction[vid-1]:
+                self.__NewSTGt3[vid-1] = self.__simulationTimeSeconds
+                self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__NewSTGheadingangle[vid-1],currentlocation)
+    elif leftstg == 1: #right
+        if self.__NewSTGfirst[vid-1] == 0:
+            self.__NewSTGfirst[vid-1] = 1
+            self.__NewSTGrefHeading[vid-1] = airVehicleState.Heading
+            self.__NewSTGheadingangle[vid-1] = (airVehicleState.Heading - 90)
+            self.__NewSTGheadingangle[vid-1] = self.__NewSTGheadingangle[vid-1] if self.__NewSTGheadingangle[vid-1] >= 0 else (self.__NewSTGheadingangle[vid-1] + 360)
+
+            self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__NewSTGheadingangle[vid-1],currentlocation)
+        else:
+            headingangleError = abs(self.__NewSTGheadingangle[vid-1]-airVehicleState.Heading)
+            headingangleError = headingangleError if headingangleError < 180 else (360-headingangleError)
+            print("survey new strategy right", vid, headingangleError)
+            if headingangleError < 15:
+                if self.__NewSTGoption[vid-1] == 0 and (self.__simulationTimeSeconds-self.__NewSTGt3[vid-1]) > self.__NewSTGdt[vid-1]:
+                    print('#look forward',vid)
+                    self.__NewSTGforward[vid-1] = 0
+                    self.sendGimbleCommand(vid,0,-45)
+                    self.__NewSTGoption[vid-1] = 1
+                    self.__NewSTGt1[vid-1] = self.__simulationTimeSeconds
+                elif self.__NewSTGoption[vid-1] == 1 and (self.__simulationTimeSeconds-self.__NewSTGt1[vid-1]) > self.__NewSTGdt[vid-1]:
+                    print('#look right',vid)
+                    if self.__NewSTGforward[vid-1] == 0:
+                        self.__NewSTGforward[vid-1] = 2
+                    self.__NewSTGleft[vid-1] = 0
+                    self.sendGimbleCommand(vid,90,-45)
+                    self.__NewSTGoption[vid-1] = 2
+                    self.__NewSTGt2[vid-1] = self.__simulationTimeSeconds
+                elif self.__NewSTGoption[vid-1] == 2 and (self.__simulationTimeSeconds-self.__NewSTGt2[vid-1]) > self.__NewSTGdt[vid-1]:
+                    print('# take action',vid)
+                    if self.__NewSTGleft[vid-1] == 0:
+                        self.__NewSTGleft[vid-1] = 2
+                    self.sendGimbleCommand(vid,0,-45)
+                    self.__NewSTGoption[vid-1] = 0
+                    self.__NewSTGt3[vid-1] = self.__simulationTimeSeconds
+                    
+                    if self.__NewSTGleft[vid-1] == 1 and self.__NewSTGforward[vid-1] == 1:
+                        print('#take left',vid)
+                        self.__NewSTGheadingangle[vid-1] = (airVehicleState.Heading - 90)
+                        self.__NewSTGheadingangle[vid-1] = self.__NewSTGheadingangle[vid-1] if self.__NewSTGheadingangle[vid-1] >= 0 else (self.__NewSTGheadingangle[vid-1] + 360)
+
+                        self.__NewSTGdtaction[vid-1] = 7
+                        self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__NewSTGheadingangle[vid-1],currentlocation)
+                      
+                    elif self.__NewSTGleft[vid-1] == 1 and self.__NewSTGforward[vid-1] == 2:
+                        print('#go straignt',vid)
+                        self.__NewSTGheadingangle[vid-1] = airVehicleState.Heading
+                        self.__NewSTGdtaction[vid-1] = 7
+                        
+                    elif self.__NewSTGleft[vid-1] == 2 and self.__NewSTGforward[vid-1] == 1:
+                        print('#take hard left',vid)
+                        self.__NewSTGheadingangle[vid-1] = (airVehicleState.Heading - 135)
+                        self.__NewSTGheadingangle[vid-1] = self.__NewSTGheadingangle[vid-1] if self.__NewSTGheadingangle[vid-1] >= 0 else (self.__NewSTGheadingangle[vid-1] + 360)
+
+                        self.__NewSTGdtaction[vid-1] = 7
+                        self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__NewSTGheadingangle[vid-1],currentlocation)
+                           
+                    elif self.__NewSTGleft[vid-1] == 2 and self.__NewSTGforward[vid-1] == 2:
+                        print('# take hard right',vid)
+                        self.__NewSTGheadingangle[vid-1] = (airVehicleState.Heading + 30)%360
+                        self.__NewSTGdtaction[vid-1] = 10
+                        self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__NewSTGheadingangle[vid-1],currentlocation)
+                    
+            if (self.__simulationTimeSeconds - self.__NewSTGt3[vid-1]) > self.__NewSTGdtaction[vid-1]:
+                self.__NewSTGt3[vid-1] = self.__simulationTimeSeconds
+                self.sendHeadingAngleCommandwithcurrentlocation(vid,self.__NewSTGheadingangle[vid-1],currentlocation)
+
+
+# for vid in range(1,noOfUAVs):
+                #     vState[vid],sensorStateFront[vid] = smpleHazardDetector.getAirVeicleState(vid)
+                #     smpleHazardDetector.sendGimbleCommand(vid,-sensorRotationAngle,-45)
+                # time.sleep(dt)
+                # for vid in range(1,noOfUAVs):
+                #     vState[vid],sensorStateLeft[vid] = smpleHazardDetector.getAirVeicleState(vid)
+                #     smpleHazardDetector.sendGimbleCommand(vid,sensorRotationAngle,-45)
+                # time.sleep(dt)
+                # for vid in range(1,noOfUAVs):
+                #     vState[vid],sensorStateRight[vid] = smpleHazardDetector.getAirVeicleState(vid)
+                #     smpleHazardDetector.sendGimbleCommand(vid,0,-45)
+                # for vid in range(1,noOfUAVs):
+                #     if smpleHazardDetector.getSurveyStatus(vid):
+                #         if not sensorStateLeft[vid] and not sensorStateFront[vid] and not sensorStateRight[vid]:
+                #             print('hard left')
+                #             headingangle = (vState[vid].Heading - 90)
+                #             headingangle = headingangle if headingangle>0 else headingangle+360
+                #             smpleHazardDetector.sendHeadingAngleCommandwithcurrentlocation(vid,headingangle,vState[vid].Location)
+                #         elif (sensorStateLeft[vid] and sensorStateFront[vid] and not sensorStateRight[vid]):
+                #             print('soft right')
+                #             headingangle = (vState[vid].Heading + 45) % 360
+                #             smpleHazardDetector.sendHeadingAngleCommandwithcurrentlocation(vid,headingangle,vState[vid].Location)
+                #         elif (not sensorStateLeft[vid] and sensorStateFront[vid] and not sensorStateRight[vid]):
+                #             print('right')
+                #             headingangle = (vState[vid].Heading + 90) % 360
+                #             smpleHazardDetector.sendHeadingAngleCommandwithcurrentlocation(vid,headingangle,vState[vid].Location)
+                #         elif sensorStateLeft[vid] and sensorStateFront[vid] and sensorStateRight[vid]:
+                #             print('hard right')
+                #             headingangle = (vState[vid].Heading + 135) % 360
+                #             smpleHazardDetector.sendHeadingAngleCommandwithcurrentlocation(vid,headingangle,vState[vid].Location)
+                #         else:
+                #             print('straight')
+
+                # time.sleep(5*dt)
+
+                    # if sensorState:
+                    #     print(vid,sensorState)
+                    #     smpleHazardDetector.sendGimbleCommand(vid,-45,-45)
+                    #     time.sleep(0.5)
+                    #     vState,sensorState = smpleHazardDetector.getAirVeicleState(vid)
+                    #     if sensorState:
+                    #         smpleHazardDetector.sendGimbleCommand(vid,0,-45)
+                    #         headingangle = (vState.Heading + 45) % 360
+                    #         smpleHazardDetector.sendHeadingAngleCommandwithcurrentlocation(vid,headingangle,vState.Location)
+            # time.sleep(0.1)
