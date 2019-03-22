@@ -754,3 +754,103 @@ def surveyNewStrategy(self,airVehicleState):
                     #         headingangle = (vState.Heading + 45) % 360
                     #         smpleHazardDetector.sendHeadingAngleCommandwithcurrentlocation(vid,headingangle,vState.Location)
             # time.sleep(0.1)
+
+
+
+def surveyStrategy(self,veicleid,airVehicleState,veicleLocation): # need works
+        if self.__veicleStrategiId[veicleid-1] == 0:
+            # # Right direction strategy
+            if veicleid in self.__changedirection and self.__changedirection[veicleid] and (self.__simulationTimeSeconds - self.__lasttime[veicleid-1])>20: 
+                self.__desiredheading[veicleid-1] = airVehicleState.Heading
+                if self.__counter[veicleid-1] == 0:
+                    self.__lasttime[veicleid-1] = self.__simulationTimeSeconds
+                    self.__lasttime1[veicleid-1] = self.__simulationTimeSeconds
+                    self.__desiredheading[veicleid-1] = (airVehicleState.Heading + 145)%360
+                    self.__counter[veicleid-1] = 1
+                elif self.__counter[veicleid-1] == 1:
+                    self.__desiredheading[veicleid-1] = (airVehicleState.Heading - 145)
+                    self.__desiredheading[veicleid-1] = self.__desiredheading[veicleid-1] if self.__desiredheading[veicleid-1] > 0 else self.__desiredheading[veicleid-1]+360
+                    self.__changedirection[veicleid] = False
+                    self.__counter[veicleid-1] = 0 
+                self.sendHeadingAngleCommandwithcurrentlocation(veicleid,self.__desiredheading[veicleid-1],veicleLocation)
+                
+            elif veicleid in self.__changedirection and not self.__changedirection[veicleid] and (self.__simulationTimeSeconds - self.__lasttime1[veicleid-1])>60:
+                print('hard turn Left vid', veicleid)
+                self.__lasttime1[veicleid-1] = self.__simulationTimeSeconds
+                self.__desiredheading[veicleid-1] = (airVehicleState.Heading - 45)
+                self.__desiredheading[veicleid-1] = self.__desiredheading[veicleid-1] if self.__desiredheading[veicleid-1] > 0 else self.__desiredheading[veicleid-1]+360
+                self.sendHeadingAngleCommandwithcurrentlocation(veicleid,self.__desiredheading[veicleid-1],veicleLocation)
+                
+            elif (self.__simulationTimeSeconds - self.__LastheadingAngleSendtime[veicleid-1]) > 5 and veicleid in self.__changedirection:
+                self.__LastheadingAngleSendtime[veicleid-1] = self.__simulationTimeSeconds
+                self.sendHeadingAngleCommandwithcurrentlocation(veicleid,self.__desiredheading[veicleid-1],veicleLocation)
+        elif  self.__veicleStrategiId[veicleid-1] == 1:      
+            # #Left direction strategy
+            if veicleid in self.__changedirection and self.__changedirection[veicleid] and (self.__simulationTimeSeconds - self.__lasttime[veicleid-1])>20: 
+                self.__desiredheading[veicleid-1] = airVehicleState.Heading
+                if self.__counter[veicleid-1] == 0:
+                    self.__lasttime[veicleid-1] = self.__simulationTimeSeconds
+                    self.__lasttime1[veicleid-1] = self.__simulationTimeSeconds
+                    self.__desiredheading[veicleid-1] = (airVehicleState.Heading - 145)
+                    self.__desiredheading[veicleid-1] = self.__desiredheading[veicleid-1] if self.__desiredheading[veicleid-1] > 0 else self.__desiredheading[veicleid-1]+360
+                    self.__counter[veicleid-1] = 1
+                elif self.__counter[veicleid-1] == 1:
+                    self.__desiredheading[veicleid-1] = (airVehicleState.Heading + 145)%360
+                    self.__changedirection[veicleid] = False
+                    self.__counter[veicleid-1] = 0
+                self.sendHeadingAngleCommandwithcurrentlocation(veicleid,self.__desiredheading[veicleid-1],veicleLocation)
+            
+            elif veicleid in self.__changedirection and not self.__changedirection[veicleid] and (self.__simulationTimeSeconds - self.__lasttime1[veicleid-1])>60:
+                print('hard turn Right vid', veicleid)
+                self.__lasttime1[veicleid-1] = self.__simulationTimeSeconds
+                self.__desiredheading[veicleid-1] = (airVehicleState.Heading + 45)%360
+                self.sendHeadingAngleCommandwithcurrentlocation(veicleid,self.__desiredheading[veicleid-1],veicleLocation)
+            elif (self.__simulationTimeSeconds - self.__LastheadingAngleSendtime[veicleid-1]) > 5 and veicleid in self.__changedirection:
+                self.__LastheadingAngleSendtime[veicleid-1] = self.__simulationTimeSeconds
+                self.sendHeadingAngleCommandwithcurrentlocation(veicleid,self.__desiredheading[veicleid-1],veicleLocation)
+
+
+def checkSurveyStatus(self,vstate):
+        airVehicleState = vstate
+        veicleid = vstate.ID
+        veicleLocation = vstate.Location
+        if veicleid in self.__uavsInSarvey and self.__uavsInSarvey[veicleid]:
+            #self.surveyStrategy(veicleid,airVehicleState,veicleLocation)
+            self.surveyNewStrategy(airVehicleState)
+        elif not veicleid in self.__uavisHeadingtoSurveylocation:
+            zid = self.getZoneIdLocation(veicleLocation)
+            if self.__firezoneHintLocation:
+                if zid in self.__firezoneHintLocation:
+                    self.sendGimbleCommand(veicleid,0,-45)
+                    self.sendWaypoint(veicleid,veicleLocation,self.__firezoneHintLocation[zid])
+                    self.__uavisHeadingtoSurveylocation[veicleid] = True
+                    self.__UAVSurvayingZoneId[veicleid] = zid
+                    
+                    self.__NoofUAVinZone[zid-1] += 1
+                    if self.__NoofUAVinZone[zid-1]%2 != 0:
+                        self.__veicleStrategiId[veicleid-1] = 1
+                else:
+                    for zid in self.__firezoneHintLocation.keys():
+                        for i in range(3):
+                            if list(self.__UAVSurvayingZoneId.values()).count(zid) >= 3:
+                                continue
+                            minLoc = Location3D()
+                            mind = 10e20
+                            minvid = 10e20
+                            for vid in self.__currentLocationofUAV.keys():
+                                if not vid in self.__uavsInSearch and not vid in self.__uavisHeadingtoSurveylocation and not vid in self.__uavsInSarvey:
+                                    loc = self.__firezoneHintLocation[zid]
+                                    d = self.getdistance(loc,self.__currentLocationofUAV[vid])
+                                    if d < mind:
+                                        mind = d
+                                        minLoc = loc
+                                        minvid = vid
+                            if mind != 10e20:
+                                self.sendGimbleCommand(minvid,0,-45)
+                                self.sendWaypoint(minvid,self.__currentLocationofUAV[minvid],minLoc)
+                                self.__uavisHeadingtoSurveylocation[minvid] = True
+                                self.__UAVSurvayingZoneId[minvid] = zid
+                                 
+                                self.__NoofUAVinZone[zid-1] += 1
+                                if self.__NoofUAVinZone[zid-1]%2 != 0:
+                                    self.__veicleStrategiId[minvid-1] = 1
