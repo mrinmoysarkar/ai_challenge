@@ -88,24 +88,29 @@
 # print(x.count(max(x)))
 
 
-import matplotlib.pyplot as plt
-from math import atan2,cos,sin,radians,degrees
+# import matplotlib.pyplot as plt
+# from math import atan2,cos,sin,radians,degrees
 
 
-x = 4
-y = 5
+# x = 4
+# y = 5
 
-theta = atan2(y,x)
-print(theta)
+# theta = atan2(y,x)
+# print(theta)
 
-d = 10
+# d = 10
 
-xc = x + d*cos(radians(90-degrees(theta)))
-yc = y - d*sin(radians(90-degrees(theta)))
+# xc = x + d*cos(radians(90-degrees(theta)))
+# yc = y - d*sin(radians(90-degrees(theta)))
 
-plt.scatter([x,xc],[y,yc])
+# plt.scatter([x,xc],[y,yc])
 
+print(max(5,6,9))
+x = [2,3,4]
+y = [7,8]
 
-
+x = y + x
+print(x)
+print(y)
 
 

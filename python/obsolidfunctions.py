@@ -894,3 +894,40 @@ def gotoWaypoint(self,veicleid):
     vehicleActionCommand.get_VehicleActionList().append(gotoWaypointAction)
     
     self.__client.sendLMCPObject(vehicleActionCommand) 
+
+def sendHeadingAngleCommand(self,veicleid,headingangle):
+    vehicleActionCommand = VehicleActionCommand()
+    vehicleActionCommand.set_VehicleID(veicleid)
+    vehicleActionCommand.set_Status(CommandStatusType.Pending)
+    vehicleActionCommand.set_CommandID(1)
+    
+    flightDirectorAction = FlightDirectorAction();
+    flightDirectorAction.set_Speed(self.__maxSpeedofUAV[veicleid])
+    flightDirectorAction.set_SpeedType(SpeedType.Airspeed)
+    flightDirectorAction.set_Heading(headingangle)
+    flightDirectorAction.set_Altitude(100)
+    flightDirectorAction.set_AltitudeType(AltitudeType.MSL)
+    flightDirectorAction.set_ClimbRate(0)
+    
+    vehicleActionCommand.get_VehicleActionList().append(flightDirectorAction)
+    
+    self.__client.sendLMCPObject(vehicleActionCommand)
+
+
+def sendHeadingAngleCommandwithcurrentlocation(self,veicleid,headingangle,currentlocation):
+    vehicleActionCommand = VehicleActionCommand()
+    vehicleActionCommand.set_VehicleID(veicleid)
+    vehicleActionCommand.set_Status(CommandStatusType.Pending)
+    vehicleActionCommand.set_CommandID(1)
+    
+    flightDirectorAction = FlightDirectorAction();
+    flightDirectorAction.set_Speed(self.__maxSpeedofUAV[veicleid])
+    flightDirectorAction.set_SpeedType(SpeedType.Airspeed)
+    flightDirectorAction.set_Heading(headingangle)
+    flightDirectorAction.set_Altitude(self.getAltitude(currentlocation)+self.__surveySafeHeight)
+    flightDirectorAction.set_AltitudeType(AltitudeType.MSL)
+    flightDirectorAction.set_ClimbRate(0)
+    
+    vehicleActionCommand.get_VehicleActionList().append(flightDirectorAction)
+    
+    self.__client.sendLMCPObject(vehicleActionCommand)
