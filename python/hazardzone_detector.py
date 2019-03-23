@@ -122,7 +122,7 @@ class SampleHazardDetector(IDataReceived):
         self.__lonBias = -122
         self.__delAlevation = 3600
         
-        self.__safeHeight = 450
+        self.__safeHeight = 50 # this value is substracted from the max range of the sensor
         self.__surveySafeHeight = 300
         self.__normalSearchAltitude = 450
         
@@ -166,6 +166,10 @@ class SampleHazardDetector(IDataReceived):
         self.__currentEntityState = {}
         self.__uavsInZone = {}
         self.__maxSpeedGlobal = 0
+        self.__sensorMaxrange = {}
+        self.__windspeedupdateTime = 4000 #in milisecond
+        self.__maxsurvayUAVForzone = 3
+        self.__maxSpeedForsurvey = 25
         
     def dataReceived(self, lmcpObject):
         # print(lmcpObject)
@@ -196,7 +200,7 @@ class SampleHazardDetector(IDataReceived):
                     
                 
             if self.__simulationTimemilliSeconds > 0: 
-                if (self.__simulationTimemilliSeconds - self.__previousWeatherReportTime) > 2000 and airVehicleState.WindSpeed > 0:
+                if (self.__simulationTimemilliSeconds - self.__previousWeatherReportTime) > self.__windspeedupdateTime and airVehicleState.WindSpeed > 0:
                     self.__previousWeatherReportTime = self.__simulationTimemilliSeconds
                     self.__wspeed += airVehicleState.WindSpeed
                     self.__ditectionTheta = airVehicleState.WindDirection
@@ -222,6 +226,7 @@ class SampleHazardDetector(IDataReceived):
             payloadconfigList = airvehicleConfiguration.PayloadConfigurationList
             self.__maxAzimuthangle[airvehicleConfiguration.ID] = payloadconfigList[0].MaxAzimuth
             self.__minAzimuthangle[airvehicleConfiguration.ID] = payloadconfigList[0].MinAzimuth
+            self.__sensorMaxrange[airvehicleConfiguration.ID] = airvehicleConfiguration.PayloadConfigurationList[2].MaxRange
             self.__airvehicleConfigList.append(airvehicleConfiguration)
             self.sendGimbleScanCommand(airvehicleConfiguration.ID,airvehicleConfiguration.PayloadConfigurationList[0].MaxAzimuthSlewRate)
              
@@ -235,7 +240,7 @@ class SampleHazardDetector(IDataReceived):
             # vid = detectingEntity
             fireZoneType = hazardDetected.get_DetectedHazardZoneType()
             
-            self.__maxSpeedofUAV[detectingEntity] = self.__maxSpeedofUAV[detectingEntity] if self.__maxSpeedofUAV[detectingEntity] <= 25 else 25 ## play here
+            self.__maxSpeedofUAV[detectingEntity] = self.__maxSpeedofUAV[detectingEntity] if self.__maxSpeedofUAV[detectingEntity] <= self.__maxSpeedForsurvey else self.__maxSpeedForsurvey ## play here
             
             self.__hazardSensorStatus[detectingEntity] = time.time()
 
@@ -273,32 +278,23 @@ class SampleHazardDetector(IDataReceived):
         missionCommand.set_CommandID(1)
 
         zid,locid = self.getNearestZone(veicleLocation,veicleid)
+        vstate = self.getAirVeicleState(veicleid)
+        safeHeight = abs(self.__sensorMaxrange[veicleid] * sin(radians(vstate.PayloadStateList[0].Elevation))) - self.__safeHeight
         
         missionCommand.set_FirstWaypoint(locid)
         
         i = 0
         for waypoint in self.__waypoints[zid]:
             i += 1
+            alti = self.getAltitudeLatLon(waypoint.get_Latitude(),waypoint.get_Longitude())
+            waypoint.set_Altitude(alti + safeHeight)
             waypoint.set_Speed(self.__maxSpeedofUAV[veicleid])
             missionCommand.get_WaypointList().append(waypoint)
         self.__totalWaypointsassignedToUAV[veicleid] = i
         self.__visitedTotalwaypoints[veicleid] = 0
         self.__previouswaypointNo[veicleid] = locid
 
-        self.__client.sendLMCPObject(missionCommand)
-          
-    def gotoWaypoint(self,veicleid):
-        gotoWaypointAction = GoToWaypointAction()  
-        vehicleActionCommand = VehicleActionCommand()
-        flightDirectorAction = FlightDirectorAction();
-        
-        vehicleActionCommand.set_VehicleID(veicleid)
-        vehicleActionCommand.set_Status(CommandStatusType.Pending)
-        vehicleActionCommand.set_CommandID(1)
-        gotoWaypointAction.set_WaypointNumber(self.__closesrWaypointID[veicleid])
-        vehicleActionCommand.get_VehicleActionList().append(gotoWaypointAction)
-        
-        self.__client.sendLMCPObject(vehicleActionCommand) 
+        self.__client.sendLMCPObject(missionCommand)     
     
     def sendWaypoint(self,veicleid,initLocation,endLocation):
         missionCommand = MissionCommand()
@@ -306,7 +302,7 @@ class SampleHazardDetector(IDataReceived):
         missionCommand.set_VehicleID(veicleid)
         missionCommand.set_Status(CommandStatusType.Pending)
         missionCommand.set_CommandID(1)
-        
+
         waypoints = self.getwaypointsBetweenLocations(initLocation,endLocation,veicleid)
         i = 0
         for waypoint in waypoints:
@@ -397,33 +393,7 @@ class SampleHazardDetector(IDataReceived):
         
         vehicleActionCommand.get_VehicleActionList().append(gimbalScanAction)
         
-        self.__client.sendLMCPObject(vehicleActionCommand)
-        
-    def sendLoiterCommand(self, veicleid, location, radius, speed):
-        #Setting up the mission to send to the UAV
-        vehicleActionCommand = VehicleActionCommand()
-        vehicleActionCommand.set_VehicleID(veicleid)
-        vehicleActionCommand.set_Status(CommandStatusType.Pending)
-        vehicleActionCommand.set_CommandID(1)
-
-        #Setting up the loiter action
-        loiterAction = LoiterAction()
-        loiterAction.set_LoiterType(LoiterType.Circular)
-        loiterAction.set_Radius(radius)
-        loiterAction.set_Axis(0)
-        loiterAction.set_Length(0)
-        loiterAction.set_Direction(LoiterDirection.Clockwise)
-        loiterAction.set_Duration(100000)
-        loiterAction.set_Airspeed(speed)
-
-        #Creating a 3D location object for the stare point
-        loiterAction.set_Location(location)
-
-        #Adding the loiter action to the vehicle action list
-        vehicleActionCommand.get_VehicleActionList().append(loiterAction)
-
-        #Sending the Vehicle Action Command message to AMASE to be interpreted
-        self.__client.sendLMCPObject(vehicleActionCommand)
+        self.__client.sendLMCPObject(vehicleActionCommand)     
 
     def sendEstimateReport(self,zid):
         #Setting up the mission to send to the UAV
@@ -472,12 +442,10 @@ class SampleHazardDetector(IDataReceived):
         
     def sendServeyCommand(self,vstate,direction):
         [xc,yc] = self.convertLatLonToxy(vstate.Location.Latitude,vstate.Location.Longitude)
-        # headingangle = (vstate.Heading + 180)%360
-        # self.sendHeadingAngleCommandwithcurrentlocation(vstate.ID,headingangle,vstate.Location)
-        # time.sleep(15)
         r = 1000
         points = self.GenerateSamplePointsOnACircleforSurvey(xc,yc,r,vstate.Heading,direction)
         vid = vstate.ID
+        safeHeight = abs(self.__sensorMaxrange[vid] * sin(radians(vstate.PayloadStateList[0].Elevation))) - self.__safeHeight
         missionCommand = MissionCommand()
         missionCommand.set_FirstWaypoint(1)
         missionCommand.set_VehicleID(vid)
@@ -492,10 +460,10 @@ class SampleHazardDetector(IDataReceived):
             waypoint.set_Latitude(lat)
             waypoint.set_Longitude(lon)
             alti = self.getAltitudeLatLon(lat,lon) 
-            if alti < self.__normalSearchAltitude:
-                waypoint.set_Altitude(self.__normalSearchAltitude)
-            else:
-                waypoint.set_Altitude(alti + self.__safeHeight)
+            # if alti < self.__normalSearchAltitude:
+            #     waypoint.set_Altitude(self.__normalSearchAltitude)
+            # else:
+            waypoint.set_Altitude(alti + safeHeight) #self.__safeHeight)
             waypoint.set_AltitudeType(AltitudeType.MSL)
             waypoint.set_Number(i)
             if i == len(points):
@@ -519,8 +487,15 @@ class SampleHazardDetector(IDataReceived):
     def callUAVSForSurvey(self,vstate):
         mind = 10e20
         vid = -1
+        zid = self.__UAVSurvayingZoneId[vstate.ID]
+        noofsurvayUAVinZone = len(self.__uavsInZone[zid])
+
+        if noofsurvayUAVinZone >= self.__maxsurvayUAVForzone:
+            return 
+
         for uav in self.__airvehicleConfigList:
-            if not uav.ID in self.self.__uavsInSearch and not uav.ID in self.__uavsInSarvey and not uav.ID in self.__uavisHeadingtoSurveylocation and self.__maxSpeedGlobal > uav.MaximumSpeed:
+            if (not uav.ID in self.__uavsInSearch) and (not uav.ID in self.__uavsInSarvey) and (not uav.ID in self.__uavisHeadingtoSurveylocation) and (self.__maxSpeedGlobal > uav.MaximumSpeed):
+                # print('uav found for survey', uav.ID)
                 vstate1 = self.getAirVeicleState(uav.ID)
                 d = self.getdistance(vstate.Location,vstate1.Location)
                 if d < mind:
@@ -529,6 +504,8 @@ class SampleHazardDetector(IDataReceived):
                     minLoc = vstate1.Location
         if vid != -1:
             self.__uavisHeadingtoSurveylocation[vid] = True
+            self.__UAVSurvayingZoneId[vid] = zid
+            self.__uavsInZone[zid].append(vid)
             self.sendWaypoint(vid,minLoc,vstate.Location) 
 
     def convertLatLonToxy(self,lat,long):
@@ -547,7 +524,7 @@ class SampleHazardDetector(IDataReceived):
      
     def GenerateSamplePointsOnACircle(self,x,y,r):
         Points = []
-        StepSize = 10
+        StepSize = 30
         Np = round(360/StepSize)
         for i in range(Np):
             angle = 360 - i * StepSize
@@ -718,6 +695,8 @@ class SampleHazardDetector(IDataReceived):
         return zoneid,minLocid
     
     def getwaypointsBetweenLocations(self,startLoc,endLoc,vid): 
+        vstate = self.getAirVeicleState(vid)
+        safeHeight = abs(self.__sensorMaxrange[vid] * sin(radians(vstate.PayloadStateList[0].Elevation))) - self.__safeHeight
         d = self.getdistance(startLoc,endLoc)
         [xs,ys] = self.convertLatLonToxy(startLoc.get_Latitude(),startLoc.get_Longitude())
         [xe,ye] = self.convertLatLonToxy(endLoc.get_Latitude(),endLoc.get_Longitude())
@@ -755,10 +734,10 @@ class SampleHazardDetector(IDataReceived):
             waypoint.set_Latitude(lat)
             waypoint.set_Longitude(lon)
             alti = self.getAltitudeLatLon(lat,lon) 
-            if alti < self.__normalSearchAltitude:
-                waypoint.set_Altitude(self.__normalSearchAltitude)
-            else:
-                waypoint.set_Altitude(alti + self.__safeHeight)
+            # if alti < self.__normalSearchAltitude:
+            #     waypoint.set_Altitude(self.__normalSearchAltitude)
+            # else:
+            waypoint.set_Altitude(alti + safeHeight) #self.__safeHeight)
             waypoint.set_AltitudeType(AltitudeType.MSL)
             waypoint.set_Number(waypointNumber)
             waypoint.set_NextWaypoint(waypointNumber+1)
@@ -786,10 +765,10 @@ class SampleHazardDetector(IDataReceived):
             waypoint.set_Latitude(lat)
             waypoint.set_Longitude(lon)
             alti = self.getAltitudeLatLon(lat,lon) 
-            if alti < self.__normalSearchAltitude:
-                waypoint.set_Altitude(self.__normalSearchAltitude)
-            else:
-                waypoint.set_Altitude(alti + self.__safeHeight)
+            # if alti < self.__normalSearchAltitude:
+            #     waypoint.set_Altitude(self.__normalSearchAltitude)
+            # else:
+            waypoint.set_Altitude(alti + safeHeight) #self.__safeHeight)
             waypoint.set_AltitudeType(AltitudeType.MSL)
             waypoint.set_Number(waypointNumber)
             if i == len(points)-1:
@@ -807,6 +786,8 @@ class SampleHazardDetector(IDataReceived):
         return waypoints
     
     def getBetweenLatLon(self,startLoc,endLoc,startwaypointId,d,connectingwaypointId,vid):
+        vstate = self.getAirVeicleState(vid)
+        safeHeight = abs(self.__sensorMaxrange[vid] * sin(radians(vstate.PayloadStateList[0].Elevation))) - self.__safeHeight
         [xs,ys] = self.convertLatLonToxy(startLoc.get_Latitude(),startLoc.get_Longitude())
         [xe,ye] = self.convertLatLonToxy(endLoc.get_Latitude(),endLoc.get_Longitude())
         delx = xe-xs
@@ -827,10 +808,10 @@ class SampleHazardDetector(IDataReceived):
             waypoint.set_Latitude(lat)
             waypoint.set_Longitude(lon)
             alti = self.getAltitudeLatLon(lat,lon) 
-            if alti < self.__normalSearchAltitude:
-                waypoint.set_Altitude(self.__normalSearchAltitude)
-            else:
-                waypoint.set_Altitude(alti + self.__safeHeight)
+            # if alti < self.__normalSearchAltitude:
+            #     waypoint.set_Altitude(self.__normalSearchAltitude)
+            # else:
+            waypoint.set_Altitude(alti + safeHeight) #self.__safeHeight)
             waypoint.set_AltitudeType(AltitudeType.MSL)
             waypoint.set_Number(waypointNumber)
             if i == ii-1:
@@ -1275,6 +1256,10 @@ if __name__ == '__main__':
                 uavlist = smpleHazardDetector.getAirveicleConfigList()
                 for uav in uavlist:
                     vstate = smpleHazardDetector.getAirVeicleState(uav.ID)
+                    #update global map
+                    #check power
+                    #check if mission complete or not
+                    #check if smoke detected
                     if smpleHazardDetector.getSurveyStatus(uav.ID):
                         if not uav.ID in sensorState:
                             direction = smpleHazardDetector.getSurveyDirection(uav.ID)
@@ -1285,8 +1270,7 @@ if __name__ == '__main__':
                             direction = smpleHazardDetector.getSurveyDirection(uav.ID)
                             smpleHazardDetector.sendServeyCommand(vstate,direction)
                             smpleHazardDetector.callUAVSForSurvey(vstate)
-
-                    smpleHazardDetector.setSurveyStatus(uav.ID,False)
+                        smpleHazardDetector.setSurveyStatus(uav.ID,False)
            
     except KeyboardInterrupt as ki:
         print("Stopping amase tcp client")

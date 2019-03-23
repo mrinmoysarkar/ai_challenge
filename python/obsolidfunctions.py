@@ -854,3 +854,43 @@ def checkSurveyStatus(self,vstate):
                                 self.__NoofUAVinZone[zid-1] += 1
                                 if self.__NoofUAVinZone[zid-1]%2 != 0:
                                     self.__veicleStrategiId[minvid-1] = 1
+
+
+def sendLoiterCommand(self, veicleid, location, radius, speed):
+    #Setting up the mission to send to the UAV
+    vehicleActionCommand = VehicleActionCommand()
+    vehicleActionCommand.set_VehicleID(veicleid)
+    vehicleActionCommand.set_Status(CommandStatusType.Pending)
+    vehicleActionCommand.set_CommandID(1)
+
+    #Setting up the loiter action
+    loiterAction = LoiterAction()
+    loiterAction.set_LoiterType(LoiterType.Circular)
+    loiterAction.set_Radius(radius)
+    loiterAction.set_Axis(0)
+    loiterAction.set_Length(0)
+    loiterAction.set_Direction(LoiterDirection.Clockwise)
+    loiterAction.set_Duration(100000)
+    loiterAction.set_Airspeed(speed)
+
+    #Creating a 3D location object for the stare point
+    loiterAction.set_Location(location)
+
+    #Adding the loiter action to the vehicle action list
+    vehicleActionCommand.get_VehicleActionList().append(loiterAction)
+
+    #Sending the Vehicle Action Command message to AMASE to be interpreted
+    self.__client.sendLMCPObject(vehicleActionCommand)
+
+def gotoWaypoint(self,veicleid):
+    gotoWaypointAction = GoToWaypointAction()  
+    vehicleActionCommand = VehicleActionCommand()
+    flightDirectorAction = FlightDirectorAction();
+    
+    vehicleActionCommand.set_VehicleID(veicleid)
+    vehicleActionCommand.set_Status(CommandStatusType.Pending)
+    vehicleActionCommand.set_CommandID(1)
+    gotoWaypointAction.set_WaypointNumber(self.__closesrWaypointID[veicleid])
+    vehicleActionCommand.get_VehicleActionList().append(gotoWaypointAction)
+    
+    self.__client.sendLMCPObject(vehicleActionCommand) 
