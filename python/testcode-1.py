@@ -188,14 +188,14 @@ print(d)
 
 # from sets import Set
 x = np.array([[1,2],[2,3]])
-y = np.array([[2,1]])
+y = np.array([[1,2]])
 
 #test y is a subset of x or not
 counter = 0
 for i in range(len(y)):
     for j in range(len(x)):
-        if sum(x[j] == y[i])==len(y[i]):
-            counter += 1
+        print(x[j] == y[i])
+            # counter += 1
 print(counter == len(y))
 
 # print(np.unique(x))
