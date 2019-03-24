@@ -169,6 +169,8 @@ class SampleHazardDetector(IDataReceived):
         self.__surveyCircleRadius = 1000
         self.__searchCircleRadius = 3000
         self.__uavRecharging = {}
+
+        self.__secondaryMergeThreshold = 0
         
     def dataReceived(self, lmcpObject):
         if isinstance(lmcpObject, KeepInZone):
@@ -520,7 +522,7 @@ class SampleHazardDetector(IDataReceived):
         dh = h/hSeg
         currCenterx = -w/2
         currCentery = -h/2
-
+        self.__secondaryMergeThreshold = max(dw,dh)
         for ws in range(wSeg):
             for hs in range(hSeg):
                 zoneid = ws*hSeg + hs + 1
@@ -1030,45 +1032,41 @@ class SampleHazardDetector(IDataReceived):
         x_span=p0[0]-p1[0]
         return atan2(y_span,x_span)
 
-    def MergeFireZones(self,Zones):
-        Zids = Zones.keys()
-        ZoneCenters = []
-        for zcenter in self.__zoneCenter:
-            ZoneCenters.append(self.convertLatLonToxy(zcenter.get_Latitude(), zcenter.get_Longitude()))
+    def secondaryMerge(self,data):
+        while True:
+            keys = list(data.keys())
+            newData = {}
+            newKey = 0
+            for i in range(len(keys)):
+                for j in range(i+1,len(keys)):
+                    p1 = np.mean(np.array(data[keys[i]]))
+                    p2 = np.mean(np.array(data[keys[j]]))
+                    d = np.linalg.norm(p1-p2)
+                    if d <= self.__secondaryMergeThreshold:
+                        newData[newKey] = data[keys[i]] + data[keys[j]]
+                        newKey += 1
+            if newKey != 0:
+                data = newData
+            elif newKey == 0:
+                return data
 
 
-        Nz =  len(Zids)
-        NewZones = {}
-        Checked = []
-        for i in range(Nz):
-            if i not in Checked:
-                CurrentZoneFirePoints = Zones[Zids[i]]
-                CurrentZoneCenter = ZoneCenters[i]
-                CurrentFireCenter = np.mean(CurrentZoneFirePoints,axis=0)
-            for j in range(Nz):
-                if j != i:
-                    NextZoneCenter = ZoneCenters[j][:]
-                    NextZoneFirePoints = Zones[Zids[j]]
-                    NextFireCenter = np.mean(NextZoneFirePoints,axis=0)
-                    D = (CurrentFireCenter[0]-NextFireCenter[0])**2 + (CurrentFireCenter[1]-NextFireCenter[1])**2
-                    ThresholdD = (CurrentZoneCenter[0]-NextZoneCenter[0])**2 + (CurrentZoneCenter[1]-NextZoneCenter[1])**2
-                    if D < ThresholdD:
-                        NewZones[Zids[i]] = list(CurrentZoneFirePoints)
-                        NewZones[Zids[i]] += Zones[Zids[j]]
-                    Checked.append(j)
-        return NewZones
-
-    def ClusteringSamples(self, X):
-        OriginalX = np.array(X)
-        X = StandardScaler().fit_transform(X)
-        clustering = MeanShift().fit(X)
+    def mergeFireZones(self, allxypoints):
+        originalxypoints = np.array(allxypoints)
+        allxypoints = StandardScaler().fit_transform(allxypoints)
+        clustering = MeanShift().fit(allxypoints)
         labels = np.array(clustering.labels_)
         uniquelabels = np.unique(labels)
         print(uniquelabels)
-        NewX = {}
+        pointsInZones = {}
         for label in uniquelabels:
-            NewX[label] = np.select(labels==label,OriginalX)
-        return NewX
+            condition = labels==label
+            data = originalxypoints[condition]
+            # print('**********')
+            # print(data)
+            pointsInZones[label] = data
+        # print(pointsInZones)
+        return pointsInZones
 
     def findBoundaryandSendReport(self):        
         if self.__firezonePoints:
@@ -1080,13 +1078,33 @@ class SampleHazardDetector(IDataReceived):
                 
                 allxypoints += points
                    
-            if len(allxypoints) >= 10:
-                newX = self.ClusteringSamples(allxypoints[:])
-                for key in newX.keys():
-                    allxypoints = newX[key]
+            if len(allxypoints) >= 3:
+                pointsInZones = self.mergeFireZones(allxypoints[:])
+                data = {}
+                flag = False
+                for key in pointsInZones.keys():
+                    allxypoints = pointsInZones[key]
+                    # print('points')
+                    # print(allxypoints)
                     if len(allxypoints) >= 3:
-                        boundarypoints = self.graham_scan(allxypoints)
-                        print(boundarypoints)
+                        print('what is that')
+                        boundarypoints = self.graham_scan(list(allxypoints[:]))
+                        data[key] = boundarypoints
+                        flag = True
+                if flag:
+                    data = self.secondaryMerge(data)
+                else:
+                    data = self.secondaryMerge(pointsInZones)
+                for key in data.keys():
+                    allxypoints = data[key]
+                    # print('points')
+                    # print(allxypoints)
+                    if len(allxypoints) >= 3:
+                        print('what is that 2')
+                        boundarypoints = self.graham_scan(list(allxypoints[:]))
+                        
+                        # print('boundary points')
+                        # print(boundarypoints)
                         # self.__firezonePoints[key] = boundarypoints
                         # if self.__wspeed != 0:
                         #     self.translateEstimatedShape(self.__wspeed,self.__ditectionTheta)

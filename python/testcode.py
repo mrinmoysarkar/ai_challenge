@@ -129,18 +129,46 @@
 # print(mergeThetree(2,[]))
 
 import numpy as np
-x=np.array([[1,2],[2,2],[3,3],[4,4],[4,5],[4,6]])
-labels = [1,2,1,2,2,1]
-print(np.array(labels)==1)
-print(x[(np.array(labels)==1).all()])
+
+for i in range(10):
+    x=np.array([[1,2],[2,2],[3,3],[4,4],[4,5],[4,6]])
+    labels = np.array([1,2,1,2,2,1])
+    condition = labels==1
+    print(x[condition])
 
 
 
-def callfunc(lst):
-    lst += [[2,3]]
-    print(lst)
+# def callfunc(lst):
+#     lst += [[2,3]]
+#     print(lst)
 
-lst = [[1,1],[2,2]]
+# lst = [[1,1],[2,2]]
 
-callfunc(lst[:])
-print(lst)
+# callfunc(lst[:])
+# print(lst)
+
+
+x = 3
+y = 5
+a = 7
+b = 8
+eps = 10e-5
+theta = radians(40+eps)
+tn = tan(theta)
+x1 = x + y*tn
+y1 = y + x/tn
+
+xs1 = (x+x1)/2
+ys1 = y/2
+
+xs2 = x/2
+ys2 = (y+y1)/2
+
+x2 = xs2+(b-ys2)/tn
+y2 = ys1+(a-xs1)*tn
+
+xs3 = (xs2+x2)/2
+ys3 = (ys2+b)/2
+
+xs4 = (xs1+a)/2
+ys4 = (ys1+y2)/2

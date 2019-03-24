@@ -956,3 +956,32 @@ def sendHeadingAngleCommandwithcurrentlocation(self,veicleid,headingangle,curren
         vehicleActionCommand.get_VehicleActionList().append(gimbleAngleAction)
         
         self.__client.sendLMCPObject(vehicleActionCommand)
+
+
+def MergeFireZones(self,Zones):
+    Zids = Zones.keys()
+    ZoneCenters = []
+    for zcenter in self.__zoneCenter:
+        ZoneCenters.append(self.convertLatLonToxy(zcenter.get_Latitude(), zcenter.get_Longitude()))
+
+
+    Nz =  len(Zids)
+    NewZones = {}
+    Checked = []
+    for i in range(Nz):
+        if i not in Checked:
+            CurrentZoneFirePoints = Zones[Zids[i]]
+            CurrentZoneCenter = ZoneCenters[i]
+            CurrentFireCenter = np.mean(CurrentZoneFirePoints,axis=0)
+        for j in range(Nz):
+            if j != i:
+                NextZoneCenter = ZoneCenters[j][:]
+                NextZoneFirePoints = Zones[Zids[j]]
+                NextFireCenter = np.mean(NextZoneFirePoints,axis=0)
+                D = (CurrentFireCenter[0]-NextFireCenter[0])**2 + (CurrentFireCenter[1]-NextFireCenter[1])**2
+                ThresholdD = (CurrentZoneCenter[0]-NextZoneCenter[0])**2 + (CurrentZoneCenter[1]-NextZoneCenter[1])**2
+                if D < ThresholdD:
+                    NewZones[Zids[i]] = list(CurrentZoneFirePoints)
+                    NewZones[Zids[i]] += Zones[Zids[j]]
+                Checked.append(j)
+    return NewZones
