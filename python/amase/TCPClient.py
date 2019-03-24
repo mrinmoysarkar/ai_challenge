@@ -14,8 +14,15 @@ from lmcp import LMCPFactory
 from lmcp import LMCPObject
 import abc
 import threading
+import sys
 
-class IDataReceived(abc.ABC):
+if sys.version_info >= (3, 4):
+    ABC = abc.ABC
+else:
+    ABC = abc.ABCMeta('ABC', (), {})
+
+
+class IDataReceived(ABC):
     @abc.abstractmethod
     def dataReceived(self, lmcpObject):
         pass

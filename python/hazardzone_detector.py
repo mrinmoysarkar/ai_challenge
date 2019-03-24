@@ -38,6 +38,7 @@ from afrl.cmasi.WeatherReport import WeatherReport
 from math import sin,cos,atan2,pi,radians,sqrt
 from random import randint
 import pandas as pd
+import numpy as np
 from afrl.cmasi.searchai.HazardType import HazardType
 from afrl.cmasi.NavigationMode import NavigationMode
 from afrl.cmasi.EntityConfiguration import EntityConfiguration
@@ -47,6 +48,11 @@ from afrl.cmasi.perceive.EntityPerception import EntityPerception
 from afrl.cmasi.RemoveEntities import RemoveEntities
 from afrl.cmasi.GimbalScanAction import GimbalScanAction
 import time
+from sklearn.cluster import DBSCAN
+from sklearn.cluster import MeanShift
+from sklearn import metrics
+from sklearn.preprocessing import StandardScaler
+
 # import utm
 
 filePath = '../../altitude_data/'
@@ -90,11 +96,6 @@ class SampleHazardDetector(IDataReceived):
         
         self.__maxSpeedofUAV = {}
         
-        
-        
-        
-        
-        
         self.__resulationOfGrid = 1000
         self.__minidel = 500
         
@@ -118,10 +119,6 @@ class SampleHazardDetector(IDataReceived):
         self.altidata4 = pd.read_csv(filePath+'altidata4.csv',header=None)
         self.altidata4 = self.altidata4.T
 
-        
-        
-        
-        
         self.__safeHeight = 100 # this value is substracted from the max range of the sensor
         self.__surveySafeHeight = 300
         self.__normalSearchAltitude = 450
@@ -153,9 +150,7 @@ class SampleHazardDetector(IDataReceived):
         self.__visitedTotalwaypoints = {}
         self.__updateArea = False
         
-        
-
-#############################################################
+       
         self.__currentVicleState = {}
         self.__simulationTimemilliSeconds = 0
         self.__hazardSensorStatus = {}
@@ -168,11 +163,12 @@ class SampleHazardDetector(IDataReceived):
         self.__uavsInZone = {}
         self.__maxSpeedGlobal = 0
         self.__sensorMaxrange = {}
-        self.__windspeedupdateTime = 4000 #in milisecond
+        self.__windspeedupdateTime = 5000 #in milisecond
         self.__maxsurvayUAVForzone = 3
         self.__maxSpeedForsurvey = 25
         self.__surveyCircleRadius = 1000
         self.__searchCircleRadius = 3000
+        self.__uavRecharging = {}
         
     def dataReceived(self, lmcpObject):
         if isinstance(lmcpObject, KeepInZone):
@@ -294,7 +290,9 @@ class SampleHazardDetector(IDataReceived):
 
         self.__client.sendLMCPObject(missionCommand)     
     
-    def sendWaypoint(self,veicleid,initLocation,endLocation):
+    def sendWaypoint(self,veicleid,initLocation,endLocation,radius=0):
+        if radius == 0:
+            radius = self.__searchCircleRadius
         missionCommand = MissionCommand()
         missionCommand.set_FirstWaypoint(1)
         missionCommand.set_VehicleID(veicleid)
@@ -305,7 +303,7 @@ class SampleHazardDetector(IDataReceived):
         safeHeight = abs(self.__sensorMaxrange[veicleid] * sin(radians(vstate.PayloadStateList[0].Elevation))) - self.__safeHeight
         
 
-        waypoints = self.getwaypointsBetweenLocations(initLocation,endLocation,veicleid)
+        waypoints = self.getwaypointsBetweenLocations(initLocation,endLocation,veicleid,radius)
         waypointaltimap,waypointconnectingmap = self.mapaltiwithwaypointnumber(waypoints)
 
         i = 0
@@ -321,30 +319,6 @@ class SampleHazardDetector(IDataReceived):
         self.__previouswaypointNo[veicleid] = 1 
         self.__client.sendLMCPObject(missionCommand)
         
-    def sendGimbleCommand(self, veicleid, azimuthangle,elevationangle):
-        #Setting up the mission to send to the UAV
-        vehicleActionCommand = VehicleActionCommand()
-        vehicleActionCommand.set_VehicleID(veicleid)
-        vehicleActionCommand.set_Status(CommandStatusType.Pending)
-        vehicleActionCommand.set_CommandID(1)
-         
-        if azimuthangle >=  self.__minAzimuthangle[veicleid] and azimuthangle <=  self.__maxAzimuthangle[veicleid]:
-            azimuthangle = azimuthangle
-        elif azimuthangle <= self.__minAzimuthangle[veicleid]:
-            azimuthangle = self.__minAzimuthangle[veicleid]
-        else:
-            azimuthangle = self.__maxAzimuthangle[veicleid]
-        
-        gimbleAngleAction = GimbalAngleAction()
-        gimbleAngleAction.set_PayloadID(1)
-        gimbleAngleAction.set_Azimuth(azimuthangle)
-        gimbleAngleAction.set_Elevation(elevationangle)
-        gimbleAngleAction.set_Rotation(0)
-        
-        vehicleActionCommand.get_VehicleActionList().append(gimbleAngleAction)
-        
-        self.__client.sendLMCPObject(vehicleActionCommand)
-
     def sendGimbleScanCommand(self,veicleid,slewRate):
         #Setting up the mission to send to the UAV
         vehicleActionCommand = VehicleActionCommand()
@@ -664,13 +638,13 @@ class SampleHazardDetector(IDataReceived):
         self.__waypoints[zoneid] = waypoints + self.__waypoints[zoneid]
         return zoneid,minLocid
     
-    def getwaypointsBetweenLocations(self,startLoc,endLoc,vid): 
+    def getwaypointsBetweenLocations(self,startLoc,endLoc,vid,radius): 
         vstate = self.getAirVeicleState(vid)
         safeHeight = abs(self.__sensorMaxrange[vid] * sin(radians(vstate.PayloadStateList[0].Elevation))) - self.__safeHeight
         d = self.getdistance(startLoc,endLoc)
         [xs,ys] = self.convertLatLonToxy(startLoc.get_Latitude(),startLoc.get_Longitude())
         [xe,ye] = self.convertLatLonToxy(endLoc.get_Latitude(),endLoc.get_Longitude())
-        radius = self.__searchCircleRadius
+        # radius = self.__searchCircleRadius
         xc = xe
         yc = ye
         points = self.GenerateSamplePointsOnACircle(xc,yc,radius)
@@ -1056,30 +1030,78 @@ class SampleHazardDetector(IDataReceived):
         x_span=p0[0]-p1[0]
         return atan2(y_span,x_span)
 
+    def MergeFireZones(self,Zones):
+        Zids = Zones.keys()
+        ZoneCenters = []
+        for zcenter in self.__zoneCenter:
+            ZoneCenters.append(self.convertLatLonToxy(zcenter.get_Latitude(), zcenter.get_Longitude()))
+
+
+        Nz =  len(Zids)
+        NewZones = {}
+        Checked = []
+        for i in range(Nz):
+            if i not in Checked:
+                CurrentZoneFirePoints = Zones[Zids[i]]
+                CurrentZoneCenter = ZoneCenters[i]
+                CurrentFireCenter = np.mean(CurrentZoneFirePoints,axis=0)
+            for j in range(Nz):
+                if j != i:
+                    NextZoneCenter = ZoneCenters[j][:]
+                    NextZoneFirePoints = Zones[Zids[j]]
+                    NextFireCenter = np.mean(NextZoneFirePoints,axis=0)
+                    D = (CurrentFireCenter[0]-NextFireCenter[0])**2 + (CurrentFireCenter[1]-NextFireCenter[1])**2
+                    ThresholdD = (CurrentZoneCenter[0]-NextZoneCenter[0])**2 + (CurrentZoneCenter[1]-NextZoneCenter[1])**2
+                    if D < ThresholdD:
+                        NewZones[Zids[i]] = list(CurrentZoneFirePoints)
+                        NewZones[Zids[i]] += Zones[Zids[j]]
+                    Checked.append(j)
+        return NewZones
+
+    def ClusteringSamples(self, X):
+        OriginalX = np.array(X)
+        X = StandardScaler().fit_transform(X)
+        clustering = MeanShift().fit(X)
+        labels = np.array(clustering.labels_)
+        uniquelabels = np.unique(labels)
+        print(uniquelabels)
+        NewX = {}
+        for label in uniquelabels:
+            NewX[label] = np.select(labels==label,OriginalX)
+        return NewX
+
     def findBoundaryandSendReport(self):        
         if self.__firezonePoints:
             reset = False
+            allxypoints = []
             for key in self.__firezonePoints.keys():
                 points = self.__firezonePoints[key]
                 # self.__firezonePoints[key] = []
                 
-                allxypoints = points
+                allxypoints += points
                    
-                if len(allxypoints) >= 3:
-                    boundarypoints = self.graham_scan(allxypoints)
-                    self.__firezonePoints[key] = boundarypoints
-                    if self.__wspeed != 0:
-                        self.translateEstimatedShape(self.__wspeed,self.__ditectionTheta)
-                        boundarypoints = self.__firezonePoints[key]
-                        reset = True
-                    for xypoint in boundarypoints:
-                        [lat,lon]=self.convertxyToLatLon(xypoint[0],xypoint[1])
-                        locationpoint = Location3D()
-                        locationpoint.set_Latitude(lat)
-                        locationpoint.set_Longitude(lon)
-                        self.__estimatedHazardZone.get_BoundaryPoints().append(locationpoint)             
-                    self.sendEstimateReport(key)
-                    self.__estimatedHazardZone = Polygon()
+            if len(allxypoints) >= 10:
+                newX = self.ClusteringSamples(allxypoints[:])
+                for key in newX.keys():
+                    allxypoints = newX[key]
+                    if len(allxypoints) >= 3:
+                        boundarypoints = self.graham_scan(allxypoints)
+                        print(boundarypoints)
+                        # self.__firezonePoints[key] = boundarypoints
+                        # if self.__wspeed != 0:
+                        #     self.translateEstimatedShape(self.__wspeed,self.__ditectionTheta)
+                        #     boundarypoints = self.__firezonePoints[key]
+                        #     reset = True
+                        for xypoint in boundarypoints:
+                            [lat,lon]=self.convertxyToLatLon(xypoint[0],xypoint[1])
+                            locationpoint = Location3D()
+                            locationpoint.set_Latitude(lat)
+                            locationpoint.set_Longitude(lon)
+                            self.__estimatedHazardZone.get_BoundaryPoints().append(locationpoint)             
+                        self.sendEstimateReport(key)
+                        self.__estimatedHazardZone = Polygon()
+
+
             if reset:
                 self.__wspeed = 0
                 self.__ditectionTheta = 0
@@ -1192,6 +1214,46 @@ class SampleHazardDetector(IDataReceived):
                     return True
         return False
 
+    def checkpowerStatus(self,AirVehicleState):
+        veicleid = AirVehicleState.ID
+        Goback = False
+        AvailableEnergy =  AirVehicleState.EnergyAvailable
+        if AvailableEnergy > 60:
+            self.__uavRecharging[veicleid] = False
+            return
+        if veicleid in self.__uavRecharging and self.__uavRecharging[veicleid]:
+            return
+
+        EnergyRate = AirVehicleState.ActualEnergyRate
+        Location = AirVehicleState.Location
+        Speed = self.__maxSpeedofUAV[veicleid]
+        Lat = Location.get_Latitude()
+        Lon = Location.get_Longitude()
+        [x,y] = self.convertLatLonToxy(Lat,Lon)
+        Dist = []
+        RecoveryPos = [x,y]
+        if EnergyRate > 0.0:
+            Dist = []
+            for rzone in self.__recoveryPoints:
+                [x2,y2] = self.convertLatLonToxy(rzone.CenterPoint.get_Latitude(),rzone.CenterPoint.get_Longitude())
+                d = ((x - x2)**2 + (y - y2)**2)**0.5
+                Dist.append(d)
+            MinIndice = np.argmin(Dist)
+            RemainTime =  AvailableEnergy / EnergyRate
+            MaximumDistLeft = Speed * RemainTime
+            # if veicleid == 4:
+            #     print('uav',veicleid, AvailableEnergy,'max disthat can be traveled ', MaximumDistLeft, 'recovery zone area', Dist[MinIndice])
+            if Dist[MinIndice] >= MaximumDistLeft:
+                Goback = True
+                RecoveryPos = self.__recoveryPoints[MinIndice].CenterPoint 
+                radius = self.__recoveryPoints[MinIndice].Radius
+                radius = radius*0.95
+                self.__uavRecharging[veicleid] = True
+                self.__uavsInSearch[veicleid] = False
+                self.sendWaypoint(veicleid, Location, RecoveryPos, radius=radius)
+                # print('uav',veicleid,'recharging')
+
+        # return Goback,RecoveryPos
 
 
 
@@ -1219,14 +1281,13 @@ if __name__ == '__main__':
         sensorState = {}
        
         previousReportingtime = 0
-        reportingTime = 5
+        reportingTime = 10
         while True:
             #wait for keyboard interrupt
             if smpleHazardDetector.getSimTime() > 0:
                 if smpleHazardDetector.getSendReportStatus() and (time.time() - previousReportingtime) > reportingTime:
                     smpleHazardDetector.findBoundaryandSendReport()
                     previousReportingtime = time.time()
-
             
                 if not smpleHazardDetector.getMissionReadyStatus():
                     smpleHazardDetector.calculateGridCoordinate()
@@ -1238,6 +1299,7 @@ if __name__ == '__main__':
                     if vstate is not None:
                         #update global map
                         #check power
+                        smpleHazardDetector.checkpowerStatus(vstate)
                         #check if mission complete or not
                         #check if smoke detected
                         if smpleHazardDetector.getSurveyStatus(uav.ID):
@@ -1251,11 +1313,13 @@ if __name__ == '__main__':
                                 smpleHazardDetector.sendServeyCommand(vstate,direction)
                                 smpleHazardDetector.callUAVSForSurvey(vstate)
                             smpleHazardDetector.setSurveyStatus(uav.ID,False)
+
+            time.sleep(dt)
            
     except KeyboardInterrupt as ki:
         print("Stopping amase tcp client")
     except Exception as ex:
         print('exception')
         print(ex)
-        print(ex.args)
+        # print(ex.args)
     amaseClient.stop()

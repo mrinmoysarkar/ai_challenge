@@ -105,12 +105,42 @@
 
 # plt.scatter([x,xc],[y,yc])
 
-print(max(5,6,9))
-x = [2,3,4]
-y = [7,8]
+# print(max(5,6,9))
+# x = [2,3,4]
+# y = [7,8]
 
-x = y + x
-print(x)
-print(y)
+# x = y + x
+# print(x)
+# print(y)
+
+# globalList = {1:[2,3],2:[1],3:[1]}
+
+# def mergeThetree(linkdickey,treeLeaf):
+#     if treeLeaf:
+#         if linkdickey in treeLeaf:
+#             print(treeLeaf)
+#             return treeLeaf
+#     for value in globalList[linkdickey]:
+#         mergeThetree(value,treeLeaf + [linkdickey])
 
 
+
+
+# print(mergeThetree(2,[]))
+
+import numpy as np
+x=np.array([[1,2],[2,2],[3,3],[4,4],[4,5],[4,6]])
+labels = [1,2,1,2,2,1]
+print(np.array(labels)==1)
+print(x[(np.array(labels)==1).all()])
+
+
+
+def callfunc(lst):
+    lst += [[2,3]]
+    print(lst)
+
+lst = [[1,1],[2,2]]
+
+callfunc(lst[:])
+print(lst)

@@ -931,3 +931,28 @@ def sendHeadingAngleCommandwithcurrentlocation(self,veicleid,headingangle,curren
     vehicleActionCommand.get_VehicleActionList().append(flightDirectorAction)
     
     self.__client.sendLMCPObject(vehicleActionCommand)
+
+
+ def sendGimbleCommand(self, veicleid, azimuthangle,elevationangle):
+        #Setting up the mission to send to the UAV
+        vehicleActionCommand = VehicleActionCommand()
+        vehicleActionCommand.set_VehicleID(veicleid)
+        vehicleActionCommand.set_Status(CommandStatusType.Pending)
+        vehicleActionCommand.set_CommandID(1)
+         
+        if azimuthangle >=  self.__minAzimuthangle[veicleid] and azimuthangle <=  self.__maxAzimuthangle[veicleid]:
+            azimuthangle = azimuthangle
+        elif azimuthangle <= self.__minAzimuthangle[veicleid]:
+            azimuthangle = self.__minAzimuthangle[veicleid]
+        else:
+            azimuthangle = self.__maxAzimuthangle[veicleid]
+        
+        gimbleAngleAction = GimbalAngleAction()
+        gimbleAngleAction.set_PayloadID(1)
+        gimbleAngleAction.set_Azimuth(azimuthangle)
+        gimbleAngleAction.set_Elevation(elevationangle)
+        gimbleAngleAction.set_Rotation(0)
+        
+        vehicleActionCommand.get_VehicleActionList().append(gimbleAngleAction)
+        
+        self.__client.sendLMCPObject(vehicleActionCommand)
