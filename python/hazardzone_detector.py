@@ -993,7 +993,7 @@ class SampleHazardDetector(IDataReceived):
         return d
             
     def graham_scan(self,points): 
-        print('points', points)
+        #print('points', points)
         min_idx=None
         for i,(x,y) in enumerate(points):
             if min_idx==None or y<points[min_idx][1]:
@@ -1040,45 +1040,57 @@ class SampleHazardDetector(IDataReceived):
         return atan2(y_span,x_span)
 
     def secondaryMerge(self,data):
-        loop = len(data.keys())-1
-        for lp in range(loop):
-            print('in loop',lp)
-            keys = list(data.keys())
-            newData = {}
-            newKey = 0
-            print(keys)
-            for i in range(len(keys)):
-                for j in range(i+1,len(keys)):
-                    p1 = np.mean(np.array(data[keys[i]]))
-                    p2 = np.mean(np.array(data[keys[j]]))
-                    d = np.linalg.norm(p1-p2)
-                    # print(d)
-                    if d <= self.__secondaryMergeThreshold and not self.checksubset(data[keys[j]],data[keys[i]]):
-                        newData[newKey] = data[keys[i]] + data[keys[j]]
-                        print('one data merged')
-                        newKey += 1
-            if newKey != 0:
-                data = newData
-            print(data)
-            print("**********************")
-        
-        print('data after secondary merge done phase 1')
+        #print('before secondary merge')
+        #print(data.keys())
+        #loop = len(data.keys())-1
+        #for lp in range(loop):
         while True:
-            keys = list(data.keys())
+            #print('in loop',lp)
             flag = True
+            keys = list(data.keys())
+            # newData = {}
+            # newKey = 0
+            # print(keys)
             for i in range(len(keys)):
                 for j in range(i+1,len(keys)):
-                    if self.checksubset(data[keys[j]],data[keys[i]]):
-                        flag = False
+                    p1 = np.mean(np.array(data[keys[i]]),axis=0)
+                    p2 = np.mean(np.array(data[keys[j]]),axis=0)
+                    d = np.linalg.norm(p1-p2)
+                    #print(p1,p2,d,self.__secondaryMergeThreshold)
+                    if d <= self.__secondaryMergeThreshold:# and not self.checksubset(data[keys[j]][:],data[keys[i]][:]):
+                        data[keys[i]] = data[keys[i]] + data[keys[j]]
                         del data[keys[j]]
+                        # print('one data merged')
+                        # newKey += 1
+                        flag = False
                         break
                 if not flag:
                     break
             if flag:
-                break
-        print('data after secondary merge')
-        print(data)
-        return data
+                break        
+            # if newKey != 0:
+            #     data = dict(newData)
+            # print(data)
+            # print("**********************")
+        
+        # print('data after secondary merge done phase 1')
+        # while True:
+        #     keys = list(data.keys())
+        #     flag = True
+        #     for i in range(len(keys)):
+        #         for j in range(i+1,len(keys)):
+        #             if self.checksubset(data[keys[j]],data[keys[i]]):
+        #                 flag = False
+        #                 del data[keys[j]]
+        #                 print('***************deleting data*******************')
+        #                 break
+        #         if not flag:
+        #             break
+        #     if flag:
+        #         break
+        #print('data after secondary merge')
+        #print(data.keys())
+        return dict(data)
 
 
     def mergeFireZones(self, allxypoints):
@@ -1096,7 +1108,7 @@ class SampleHazardDetector(IDataReceived):
             # print(data)
             pointsInZones[label] = data
         # print(pointsInZones)
-        return pointsInZones
+        return dict(pointsInZones)
 
     def findBoundaryandSendReport(self):        
         if self.__firezonePoints:
@@ -1121,19 +1133,19 @@ class SampleHazardDetector(IDataReceived):
                         data[key] = boundarypoints
                         flag = True
                 if flag:
-                    data = self.secondaryMerge(data)
+                    data = self.secondaryMerge(dict(data))
                 else:
-                    data = self.secondaryMerge(pointsInZones)
-                print('data returned',data)
+                    data = self.secondaryMerge(dict(pointsInZones))
+                #print('data returned',data)
                 for key in data.keys():
                     allxypoints = data[key]
                     # print('points')
                     # print(allxypoints)
                     if len(allxypoints) >= 3:
-                        print('what is that 2',allxypoints)
+                        #print('what is that 2',allxypoints)
                         boundarypoints = self.graham_scan(list(allxypoints[:]))
                         
-                        print('boundary points')
+                        #print('boundary points')
                         # print(boundarypoints)
                         # self.__firezonePoints[key] = boundarypoints
                         # if self.__wspeed != 0:
@@ -1211,9 +1223,12 @@ class SampleHazardDetector(IDataReceived):
     def checksubset(self,y,x):
         #test y is a subset of x or not
         counter = 0
+        print('check subset')
         for i in range(len(y)):
             for j in range(len(x)):
-                if sum(x[j] == y[i])==len(y[i]):
+                # print(x[j] == y[i])
+                # print('*************')
+                if sum(abs(x[j] - y[i])<[0.001,0.001])==len(y[i]):
                     counter += 1
         return counter == len(y)
 

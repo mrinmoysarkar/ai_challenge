@@ -203,3 +203,4 @@ print(counter == len(y))
 
 # print(y<=x)
 
+print(np.mean(x,axis=0))
