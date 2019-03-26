@@ -180,27 +180,32 @@ print(sys.executable)
 
 
 
-d = {1:[[1,2],[2,3]],2:[[1,2],[2,3]],3:[[1,2],[2,3]]}
+# d = {1:[[1,2],[2,3]],2:[[1,2],[2,3]],3:[[1,2],[2,3]]}
 
-print(d)
-del d[2]
-print(d)
+# print(d)
+# del d[2]
+# print(d)
 
-# from sets import Set
-x = np.array([[1,2],[2,3]])
-y = np.array([[2,1]])
+# # from sets import Set
+# x = np.array([[1,2],[2,3]])
+# y = np.array([[2,1]])
 
-#test y is a subset of x or not
-counter = 0
-for i in range(len(y)):
-    for j in range(len(x)):
-        if sum(x[j] == y[i])==len(y[i]):
-            counter += 1
-print(counter == len(y))
+# #test y is a subset of x or not
+# counter = 0
+# for i in range(len(y)):
+#     for j in range(len(x)):
+#         if sum(x[j] == y[i])==len(y[i]):
+#             counter += 1
+# print(counter == len(y))
 
-# print(np.unique(x))
-# condition = np.isin(np.array(d[1]),np.array([[1,2]]))
+# # print(np.unique(x))
+# # condition = np.isin(np.array(d[1]),np.array([[1,2]]))
 
-# print(y<=x)
+# # print(y<=x)
 
-print(np.mean(x,axis=0))
+# print(np.mean(x,axis=0))
+
+datagrid = np.random.randint(0,2,[100,100])
+
+ic = np.random.randint(0,100)
+jc = np.random.randint(0,100)
