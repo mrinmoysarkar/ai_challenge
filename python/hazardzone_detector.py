@@ -52,6 +52,7 @@ from sklearn.cluster import DBSCAN
 from sklearn.cluster import MeanShift
 from sklearn import metrics
 from sklearn.preprocessing import StandardScaler
+from scipy.spatial.distance import pdist,squareform
 
 import cv2
 
@@ -165,7 +166,7 @@ class SampleHazardDetector(IDataReceived):
         self.__uavsInZone = {}
         self.__maxSpeedGlobal = 0
         self.__sensorMaxrange = {}
-        self.__windspeedupdateTime = 5000 #in milisecond
+        self.__windspeedupdateTime = 1000 #in milisecond
         self.__maxsurvayUAVForzone = 3
         self.__maxSpeedForsurvey = 25
         self.__surveyCircleRadius = 1000
@@ -178,15 +179,18 @@ class SampleHazardDetector(IDataReceived):
         self.__glopbalmaxforpercentarea = 0
         self.__boundaryparameterFornewMission = [0,0,0,0]
         self.__stopRecursion = False
-        self.__mapResulotion = 500 #in meter
+        self.__mapResulotion = 100 #in meter
         self.__initialSmallGridW = 0
         self.__initialSmallGridH = 0
         self.__uavInSmokemisssion = {}
         self.__uavisHeadingtoSmokeSurveylocation = {}
         self.__energyThreshold = 50
         self.__maxSpeedofUAVduringSurvey = {}
-        self.__energyconsumptionRate = 0.13
+        self.__energyconsumptionRate = 0.3
         self.__mapHold = {}
+        self.__secondarysearchareaW = 10000 #in meter
+        self.__secondarysearchareaH = 10000 #in meter
+        self.__altitudetype = AltitudeType.MSL
         
     def dataReceived(self, lmcpObject):
         if isinstance(lmcpObject, KeepInZone):
@@ -221,12 +225,13 @@ class SampleHazardDetector(IDataReceived):
             if self.__simulationTimemilliSeconds > 0: 
                 if (self.__simulationTimemilliSeconds - self.__previousWeatherReportTime) > self.__windspeedupdateTime and airVehicleState.WindSpeed > 0:
                     self.__previousWeatherReportTime = self.__simulationTimemilliSeconds
-                    self.__wspeed += 0 #airVehicleState.WindSpeed
-                    self.__ditectionTheta = 0 #airVehicleState.WindDirection
+                    self.__wspeed = airVehicleState.WindSpeed
+                    self.__ditectionTheta = airVehicleState.WindDirection
                     self.__updateArea = True
-                # elif airVehicleState.WindSpeed == 0:
-                #     self.__wspeed = 0
-                #     self.__ditectionTheta = 0
+                elif airVehicleState.WindSpeed == 0:
+                    self.__wspeed = 0
+                    self.__ditectionTheta = 0
+                    self.__updateArea = False
 
         elif isinstance(lmcpObject, EntityPerception):
             pass
@@ -278,9 +283,9 @@ class SampleHazardDetector(IDataReceived):
                 self.__firezoneHintLocation[zid] = detectedLocation
                 self.__UAVSurvayingZoneId[detectingEntity] = zid
                 if not self.__firezonePoints or not zid in self.__firezonePoints:
-                    self.__firezonePoints[zid] = [[x,y]]
+                    self.__firezonePoints[zid] = [[x,y,time.time()]]
                 else:
-                    self.__firezonePoints[zid].append([x,y])
+                    self.__firezonePoints[zid].append([x,y,time.time()])
             elif fireZoneType == HazardType.Smoke:
                 # print('smoke detected')
                 self.__uavisInsmokeZone[detectingEntity] = True
@@ -315,7 +320,7 @@ class SampleHazardDetector(IDataReceived):
 
         self.__client.sendLMCPObject(missionCommand)     
     
-    def sendWaypoint(self,veicleid,initLocation,endLocation,radius=0):
+    def sendWaypoint(self,veicleid,initLocation,endLocation,radius=0,torecharge=False):
         if radius == 0:
             radius = self.__searchCircleRadius
         missionCommand = MissionCommand()
@@ -334,7 +339,10 @@ class SampleHazardDetector(IDataReceived):
         i = 0
         for waypoint in waypoints:
             i += 1
-            alti = max(waypointaltimap[waypoint.get_Number()], waypointaltimap[waypoint.get_NextWaypoint()], waypointaltimap[waypointconnectingmap[waypoint.get_NextWaypoint()]])
+            if torecharge:
+                alti = max(list(waypointaltimap.values()))
+            else:
+                alti = max(waypointaltimap[waypoint.get_Number()], waypointaltimap[waypoint.get_NextWaypoint()], waypointaltimap[waypointconnectingmap[waypoint.get_NextWaypoint()]])
             waypoint.set_Altitude(alti + safeHeight)
             waypoint.set_Speed(self.__maxSpeedofUAV[veicleid])
             missionCommand.get_WaypointList().append(waypoint)
@@ -472,7 +480,7 @@ class SampleHazardDetector(IDataReceived):
             #     waypoint.set_Altitude(self.__normalSearchAltitude)
             # else:
             waypoint.set_Altitude(alti + safeHeight) #self.__safeHeight)
-            waypoint.set_AltitudeType(AltitudeType.MSL)
+            waypoint.set_AltitudeType(self.__altitudetype)
             waypoint.set_Number(i)
             if i == len(points):
                 waypoint.set_NextWaypoint(1)
@@ -556,7 +564,7 @@ class SampleHazardDetector(IDataReceived):
             #     waypoint.set_Altitude(self.__normalSearchAltitude)
             # else:
             waypoint.set_Altitude(alti + safeHeight) #self.__safeHeight)
-            waypoint.set_AltitudeType(AltitudeType.MSL)
+            waypoint.set_AltitudeType(self.__altitudetype)
             waypoint.set_Number(i)
             if i == len(points):
                 waypoint.set_NextWaypoint(1)
@@ -689,7 +697,7 @@ class SampleHazardDetector(IDataReceived):
                     waypoint.set_Altitude(self.__normalSearchAltitude)
                 else:
                     waypoint.set_Altitude(alti + self.__safeHeight)
-                waypoint.set_AltitudeType(AltitudeType.MSL)
+                waypoint.set_AltitudeType(self.__altitudetype)
                 waypoint.set_Number(waypointNumber)
                 waypoint.set_NextWaypoint(waypointNumber+1)
                 waypoint.set_Speed(30)
@@ -832,7 +840,7 @@ class SampleHazardDetector(IDataReceived):
             #     waypoint.set_Altitude(self.__normalSearchAltitude)
             # else:
             waypoint.set_Altitude(alti + safeHeight) #self.__safeHeight)
-            waypoint.set_AltitudeType(AltitudeType.MSL)
+            waypoint.set_AltitudeType(self.__altitudetype)
             waypoint.set_Number(waypointNumber)
             waypoint.set_NextWaypoint(waypointNumber+1)
             waypoint.set_Speed(self.__maxSpeedofUAV[vid])
@@ -863,7 +871,7 @@ class SampleHazardDetector(IDataReceived):
             #     waypoint.set_Altitude(self.__normalSearchAltitude)
             # else:
             waypoint.set_Altitude(alti + safeHeight) #self.__safeHeight)
-            waypoint.set_AltitudeType(AltitudeType.MSL)
+            waypoint.set_AltitudeType(self.__altitudetype)
             waypoint.set_Number(waypointNumber)
             if i == len(points)-1:
                 waypoint.set_NextWaypoint(wpointnumber)
@@ -906,7 +914,7 @@ class SampleHazardDetector(IDataReceived):
             #     waypoint.set_Altitude(self.__normalSearchAltitude)
             # else:
             waypoint.set_Altitude(alti + safeHeight) #self.__safeHeight)
-            waypoint.set_AltitudeType(AltitudeType.MSL)
+            waypoint.set_AltitudeType(self.__altitudetype)
             waypoint.set_Number(waypointNumber)
             if i == ii-1:
                 waypoint.set_NextWaypoint(connectingwaypointId)
@@ -952,7 +960,7 @@ class SampleHazardDetector(IDataReceived):
                 waypoint.set_Altitude(self.__normalSearchAltitude)
             else:
                 waypoint.set_Altitude(alti + self.__safeHeight)
-            waypoint.set_AltitudeType(AltitudeType.MSL)
+            waypoint.set_AltitudeType(self.__altitudetype)
             waypoint.set_Number(waypointNumber)
             if option==1 and i == ii-1:
                 waypoint.set_NextWaypoint(1)
@@ -1236,6 +1244,8 @@ class SampleHazardDetector(IDataReceived):
 
     def mergeFireZones(self, allxypoints):
         originalxypoints = np.array(allxypoints)
+        allxypoints = np.array(allxypoints)
+        allxypoints = allxypoints[:,0:2]
         allxypoints = StandardScaler().fit_transform(allxypoints)
         clustering = MeanShift().fit(allxypoints)
         labels = np.array(clustering.labels_)
@@ -1251,6 +1261,36 @@ class SampleHazardDetector(IDataReceived):
         # print(pointsInZones)
         return dict(pointsInZones)
 
+    def updateSamples(self,sample,r,Np):
+        sample = np.array(sample)
+        points = sample[:,0:2]
+        dist = squareform(pdist(points))
+        [Nr,Nc] = np.shape(dist)
+        updateSample = []
+        marked = []
+        for i in range(Nr):
+            if i not in marked:
+                d= dist[i][:]
+                marked.append(i)
+                temp = []
+                for j in range(Nc):
+                    if j not in marked:
+                        if d[j] < r:
+                            temp.append(sample[j,:])
+                            marked.append(j)
+                if np.shape(temp)[0]<Np:
+                    temp = sample[i,:]
+                    temp = np.array(temp)
+                    
+                    updateSample.append(temp)
+                else:
+                    temp = np.array(temp)
+                    sorted_Indice = np.argsort(temp[:,2])
+                    temp = temp[sorted_Indice,:]
+                    updateSample.append(temp[-Np:,:])
+    
+        return updateSample
+
     def findBoundaryandSendReport(self):        
         if self.__firezonePoints:
             reset = False
@@ -1263,10 +1303,14 @@ class SampleHazardDetector(IDataReceived):
                    
             if len(allxypoints) >= 3:
                 pointsInZones = self.mergeFireZones(allxypoints[:])
+                #delete old points
                 data = {}
                 flag = False
+                r = 100 #100m
+                Np = 5  
                 for key in pointsInZones.keys():
-                    allxypoints = pointsInZones[key]
+                    allxypoints = np.array(self.updateSamples(list(pointsInZones[key]),r,Np)) #np.array(pointsInZones[key])
+                    allxypoints = allxypoints[:,0:2]
                     # print('points')
                     # print(allxypoints)
                     if len(allxypoints) >= 3:
@@ -1289,10 +1333,10 @@ class SampleHazardDetector(IDataReceived):
                         #print('boundary points')
                         # print(boundarypoints)
                         # self.__firezonePoints[key] = boundarypoints
-                        if self.__wspeed != 0:
-                            boundarypoints = self.translateEstimatedShape(self.__wspeed,self.__ditectionTheta,boundarypoints[:])
-                            # boundarypoints = self.__firezonePoints[key]
-                            reset = True
+                        # if self.__wspeed != 0:
+                        #     boundarypoints = self.translateEstimatedShape(self.__wspeed,self.__ditectionTheta,boundarypoints[:])
+                        #     # boundarypoints = self.__firezonePoints[key]
+                        #     reset = True
                         for xypoint in boundarypoints:
                             [lat,lon]=self.convertxyToLatLon(xypoint[0],xypoint[1])
                             locationpoint = Location3D()
@@ -1319,22 +1363,16 @@ class SampleHazardDetector(IDataReceived):
         self.__updateArea = status
         
     def updateEstimatedArea(self):
+        Rate = self.__wspeed
+        Angle = self.__ditectionTheta
+        X_Rate = Rate * cos(radians(Angle))
+        Y_Rate = Rate * sin(radians(Angle))
         if self.__firezonePoints:
-            reset = False
             for key in self.__firezonePoints.keys():
-                points = self.__firezonePoints[key]
-                allxypoints = points
-                   
-                if len(allxypoints) >= 3:
-                    boundarypoints = self.graham_scan(allxypoints)
-                    self.__firezonePoints[key] = boundarypoints
-                    if self.__wspeed != 0:
-                        self.translateEstimatedShape(self.__wspeed,self.__ditectionTheta)
-                        reset = True
-            if reset:
-                self.__wspeed = 0
-                self.__ditectionTheta = 0
-        
+                for i in range(len(self.__firezonePoints[key])):
+                    self.__firezonePoints[key][i][0] = self.__firezonePoints[key][i][0] - X_Rate
+                    self.__firezonePoints[key][i][1] = self.__firezonePoints[key][i][1] - Y_Rate
+                
     def translateEstimatedShape(self, WinSpeed, Angle, firepoints):
         Rate = WinSpeed
         X_Rate = Rate * cos(radians(Angle))
@@ -1461,6 +1499,8 @@ class SampleHazardDetector(IDataReceived):
         elif (not (self.__maxSpeedofUAV[vid] < self.__maxSpeedGlobal)) and ((vid in self.__uavsInSearch and not self.__uavsInSearch[vid]) or (not vid in self.__uavsInSearch) or (not vid in self.__uavsInMission) or (vid in self.__uavsInMission and not self.__uavsInMission[vid])):
             self.getNewAreaforSearch(vstate)
             self.__uavsInSearch[vid] = True
+        elif not self.__uavsInMission[vstate.ID] and vstate.EnergyAvailable > 99:
+            self.getNewAreaforSearch(vstate)
 
     def checkpowerStatus(self,AirVehicleState):
         veicleid = AirVehicleState.ID
@@ -1489,7 +1529,7 @@ class SampleHazardDetector(IDataReceived):
                 Dist.append(d)
             MinIndice = np.argmin(Dist)
             RemainTime =  AvailableEnergy / self.__energyconsumptionRate#EnergyRate
-            MaximumDistLeft = Speed * RemainTime
+            MaximumDistLeft = Speed * RemainTime - 10000
             # if veicleid == 4:
             #     print('uav',veicleid, AvailableEnergy,'max disthat can be traveled ', MaximumDistLeft, 'recovery zone area', Dist[MinIndice])
             if Dist[MinIndice] >= MaximumDistLeft:
@@ -1500,7 +1540,7 @@ class SampleHazardDetector(IDataReceived):
                 self.__uavRecharging[veicleid] = True
                 self.__uavsInSearch[veicleid] = False
                 self.__uavsInSarvey[veicleid] = False
-                self.sendWaypoint(veicleid, Location, RecoveryPos, radius=radius)
+                self.sendWaypoint(veicleid, Location, RecoveryPos, radius=radius,torecharge=True)
                 # print('uav',veicleid,'recharging')
                 self.__mapHold[veicleid] = []
                 return True
@@ -1532,8 +1572,8 @@ class SampleHazardDetector(IDataReceived):
         ic = ic if ic < self.__globalMap.shape[0] else self.__globalMap.shape[0] - 1
         jc = jc if jc < self.__globalMap.shape[1] else self.__globalMap.shape[1] - 1
 
-        w = int(10000/self.__mapResulotion)
-        h = int(10000/self.__mapResulotion)
+        w = int(self.__secondarysearchareaW/self.__mapResulotion)
+        h = int(self.__secondarysearchareaH/self.__mapResulotion)
 
         # print('center of search',ic,jc)
 
@@ -1575,7 +1615,7 @@ class SampleHazardDetector(IDataReceived):
                 waypoint.set_Altitude(self.__normalSearchAltitude)
             else:
                 waypoint.set_Altitude(alti + self.__safeHeight)
-            waypoint.set_AltitudeType(AltitudeType.MSL)
+            waypoint.set_AltitudeType(self.__altitudetype)
             waypoint.set_Number(waypointNumber)
             waypoint.set_NextWaypoint(waypointNumber+1)
             waypoint.set_Speed(30)
@@ -1622,23 +1662,38 @@ class SampleHazardDetector(IDataReceived):
         # print('in the loop')
         gridw = self.__globalMap.shape[0]
         gridh = self.__globalMap.shape[1]
-        
+        ic = i
+        jc = j        
         l = int(gridw/w)
         m = int(gridh/h)
         uavlist = self.getAirveicleConfigList()
+        mindlist = []
+        allboundary = []
 
         for i in range(l-1):
             for j in range(m-1):
-                flag = True
                 area1 = self.__globalMap[i*w:(i+1)*w,j*h:(j+1)*h]
                 p = sum(sum(area1))/float(area1.shape[0]*area1.shape[1])
                 if (1-p)>0.6:
-                    for uav in uavlist:
-                        if uav.ID in self.__mapHold and self.__mapHold[uav.ID] and i*w == self.__mapHold[uav.ID][0] and (i+1)*w == self.__mapHold[uav.ID][1] and j*h == self.__mapHold[uav.ID][2] and (j+1)*h == self.__mapHold[uav.ID][3]:
-                            flag = False
-                            break
-                    if flag:
-                        return True, [i*w,(i+1)*w,j*h,(j+1)*h]
+                    minp = min(((i-ic)**2+(j-jc)**2),((i-ic)**2+(j+1-jc)**2),((i+1-ic)**2+(j-jc)**2),((i+1-ic)**2+(j+1-jc)**2))
+                    mindlist.append(minp)
+                    allboundary.append([i*w,(i+1)*w,j*h,(j+1)*h])
+                    
+        while True:
+            if mindlist:
+                indx = np.argmin(mindlist)
+                boundary = allboundary[indx]
+                flag = True
+                for uav in uavlist:
+                    if uav.ID in self.__mapHold and self.__mapHold[uav.ID] and boundary[0] == self.__mapHold[uav.ID][0] and boundary[1] == self.__mapHold[uav.ID][1] and boundary[2] == self.__mapHold[uav.ID][2] and boundary[3] == self.__mapHold[uav.ID][3]:
+                        flag = False
+                        break
+                if flag:
+                    return True, boundary
+                del mindlist[indx]
+                del allboundary[indx]
+            else:
+                return False,[]
         return False,[]
 
     def saveMAP(self):
@@ -1656,7 +1711,7 @@ class SampleHazardDetector(IDataReceived):
 #################
 
 if __name__ == '__main__':
-    myHost = 'localhost'
+    myHost = 'localhost' #'13.77.73.31'
     myPort = 5555
     amaseClient = AmaseTCPClient(myHost, myPort)
     #amaseClient.addReceiveCallback(PrintLMCPObject())
@@ -1668,7 +1723,7 @@ if __name__ == '__main__':
         #start client thread
         amaseClient.start()
 
-        dt = 1
+        dt = 0.1
         sensorState = {}
         savetime = time.time()
         previousReportingtime = 0
@@ -1683,6 +1738,9 @@ if __name__ == '__main__':
                 if not smpleHazardDetector.getMissionReadyStatus():
                     smpleHazardDetector.calculateGridCoordinate()
                     smpleHazardDetector.sendinitialMission()
+                if smpleHazardDetector.getupdateAreaStatus():
+                    smpleHazardDetector.updateEstimatedArea()
+                    smpleHazardDetector.setupdateAreaStatus(False)
 
                 uavlist = smpleHazardDetector.getAirveicleConfigList()
                 for uav in uavlist:
@@ -1715,7 +1773,7 @@ if __name__ == '__main__':
 
             time.sleep(dt)
 
-            if (time.time() - savetime) > 700:
+            if (time.time() - savetime) > 850:
                 savetime = time.time()
                 smpleHazardDetector.saveMAP()
            

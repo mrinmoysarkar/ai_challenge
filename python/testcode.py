@@ -134,7 +134,7 @@ for i in range(10):
     x=np.array([[1,2],[2,2],[3,3],[4,4],[4,5],[4,6]])
     labels = np.array([1,2,1,2,2,1])
     condition = labels==1
-    print(x[condition])
+    # print(x[condition])
 
 
 
@@ -213,6 +213,5 @@ jc = np.random.randint(0,100)
 w=3
 h=3
 
-for i in range(k):
-    for j in range(l):
-        
+x=np.array([[1,2,3],[4,5,6]])
+print(x[:,0:2])
