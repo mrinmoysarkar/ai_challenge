@@ -1535,7 +1535,7 @@ class SampleHazardDetector(IDataReceived):
         w = int(10000/self.__mapResulotion)
         h = int(10000/self.__mapResulotion)
 
-        print('center of search',ic,jc)
+        # print('center of search',ic,jc)
 
         self.__dgrid = np.zeros(self.__dgrid.shape)
         self.__glopbalmaxforpercentarea = 0
@@ -1547,7 +1547,7 @@ class SampleHazardDetector(IDataReceived):
 
         self.__mapHold[vstate.ID] = self.__boundaryparameterFornewMission
 
-        print(self.__boundaryparameterFornewMission)
+        # print(self.__boundaryparameterFornewMission)
         if flag:
             x1 = -self.__boundaryparameterFornewMission[0]*self.__mapResulotion + self.__searchAreaWidth
             y1 = self.__boundaryparameterFornewMission[2]*self.__mapResulotion - self.__searchAreaHeight
