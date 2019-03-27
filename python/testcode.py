@@ -209,3 +209,10 @@ datagrid = np.random.randint(0,2,[100,100])
 
 ic = np.random.randint(0,100)
 jc = np.random.randint(0,100)
+
+w=3
+h=3
+
+for i in range(k):
+    for j in range(l):
+        

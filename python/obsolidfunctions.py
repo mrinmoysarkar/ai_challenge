@@ -985,3 +985,184 @@ def MergeFireZones(self,Zones):
                     NewZones[Zids[i]] += Zones[Zids[j]]
                 Checked.append(j)
     return NewZones
+
+
+
+    def smokeZoneMission(self,vstate): # needs to be debugged
+        [x,y] = self.convertLatLonToxy(vstate.Location.get_Latitude(),vstate.Location.get_Longitude()) 
+        zid = self.getZoneIdLocation(vstate.Location)
+        zboundary = self.__zoneboundaryPoints[zid]
+        print(zboundary)
+        a = zboundary[3][0]
+        b = zboundary[3][1]
+        eps = 10e-5
+        theta = radians(vstate.Heading+eps) ## needs to be checked latter
+        tn = tan(theta)
+        x1 = x + y*tn
+        y1 = y + x/tn
+
+        xs1 = (x+x1)/2
+        ys1 = y/2
+
+        xs2 = x/2
+        ys2 = (y+y1)/2
+
+        x2 = xs2+(b-ys2)/tn
+        y2 = ys1+(a-xs1)*tn
+
+        xs3 = (xs2+x2)/2
+        ys3 = (ys2+b)/2
+
+        xs4 = (xs1+a)/2
+        ys4 = (ys1+y2)/2
+
+        waypointNumber = 1
+
+        x = xs1
+        y = ys1
+
+        [lat,lon] = self.convertxyToLatLon(x,y)
+        waypoint = Waypoint()
+        waypoint.set_Latitude(lat)
+        waypoint.set_Longitude(lon)
+        alti = self.getAltitudeLatLon(lat,lon) 
+        if alti < self.__normalSearchAltitude:
+            waypoint.set_Altitude(self.__normalSearchAltitude)
+        else:
+            waypoint.set_Altitude(alti + self.__safeHeight)
+        waypoint.set_AltitudeType(AltitudeType.MSL)
+        waypoint.set_Number(waypointNumber)
+        waypoint.set_NextWaypoint(waypointNumber+1)
+        waypoint.set_Speed(30)
+        waypoint.set_SpeedType(SpeedType.Airspeed)
+        waypoint.set_ClimbRate(15)
+        waypoint.set_TurnType(TurnType.TurnShort)
+        waypoint.set_ContingencyWaypointA(0)
+        waypoint.set_ContingencyWaypointB(0)
+
+        waypoints = []
+        waypoints.append(waypoint)
+        
+        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(xs1,ys1,xs4,ys4,2,0)
+        waypoints = waypoints + wpoints
+        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(xs4,ys4,xs2,ys2,waypointNumber,0)
+        waypoints = waypoints + wpoints
+        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(xs2,ys2,xs3,ys3,waypointNumber,0)
+        waypoints = waypoints + wpoints
+        wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(xs3,ys3,xs1,ys1,waypointNumber,1)
+        waypoints = waypoints + wpoints
+
+        print('smokexonemission p2')
+
+        minima = 1e10
+        minLocid = 1
+        minLoc = Location3D()
+        
+        for i in range(len(waypoints)):
+            loc = waypoints[i]
+            d = self.getdistance(loc,vstate.Location)
+            if d < minima:
+                minima = d
+                minLoc = loc
+                minLocid = i+1
+        
+        if sqrt(minima) < 1000:
+            return waypoints,minLocid
+        
+        waypoints1,minLocid = self.getBetweenLatLon(vstate.Location,minLoc,waypointNumber,minima,minLocid,vstate.ID)
+        waypoints = waypoints1 + waypoints
+        return waypoints,minLocid
+
+
+def recursiveSearch(self,i,j,w,h):
+        # print('in the loop')
+        gridw = self.__globalMap.shape[0]
+        gridh = self.__globalMap.shape[1]
+        if i >= gridw or j >= gridh or i < 0 or j < 0:
+            return
+        if self.__dgrid[i,j] == 1:
+            return
+        self.__dgrid[i,j] = 1
+        di1 = min(gridw,i+w)
+        di2 = max(0,i-w)
+        dj1 = min(gridh,j+h)
+        dj2 = max(0,j-h)
+        
+        # print('after data grid')
+        #check the percentage here
+        area1 = self.__globalMap[i:di1,j:dj1]
+        area2 = self.__globalMap[i:di1,dj2:j]
+        area3 = self.__globalMap[di2:i,j:dj1]
+        area4 = self.__globalMap[di2:i,dj2:j]
+        
+        p1,p2,p3,p4 = 0,0,0,0
+        
+        if area1.size != 0:
+            p1 = sum(sum(area1))/float(area1.shape[0]*area1.shape[1])
+        if area2.size != 0:
+            p2 = sum(sum(area2))/float(area2.shape[0]*area2.shape[1])
+        if area3.size != 0:
+            p3 = sum(sum(area3))/float(area3.shape[0]*area3.shape[1])
+        if area4.size != 0:
+            p4 = sum(sum(area4))/float(area4.shape[0]*area4.shape[1])
+        
+        p = max(1-p1,1-p2,1-p3,1-p4)
+  
+        if p > self.__glopbalmaxforpercentarea:
+            self.__glopbalmaxforpercentarea = p
+            self.__boundaryparameterFornewMission = [i,di1,j,dj1] if p==p1 else [i,di1,dj2,j] if p==p2 else [di2,i,j,dj1] if p==p3 else [di2,i,dj2,j]
+            # print(self.__boundaryparameterFornewMission)
+            if p > 0.6:
+                self.__stopRecursion = True
+                return
+
+        
+        # call all possible grid position
+        if not self.__stopRecursion:
+            self.recursiveSearch(i+w,j,w,h)
+        if not self.__stopRecursion:
+            self.recursiveSearch(i-w,j,w,h)
+        if not self.__stopRecursion:
+            self.recursiveSearch(i,j+h,w,h)
+        if not self.__stopRecursion:
+            self.recursiveSearch(i,j-h,w,h)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# print(x1,y1,x2,y2,x3,y3,x4,y4)
+
+# self.__estimatedHazardZone = Polygon()
+# [lat,lon]=self.convertxyToLatLon(x1,y1)
+# locationpoint = Location3D()
+# locationpoint.set_Latitude(lat)
+# locationpoint.set_Longitude(lon)
+# self.__estimatedHazardZone.get_BoundaryPoints().append(locationpoint) 
+# [lat,lon]=self.convertxyToLatLon(x2,y2)
+# locationpoint = Location3D()
+# locationpoint.set_Latitude(lat)
+# locationpoint.set_Longitude(lon)
+# self.__estimatedHazardZone.get_BoundaryPoints().append(locationpoint)   
+# [lat,lon]=self.convertxyToLatLon(x3,y3)
+# locationpoint = Location3D()
+# locationpoint.set_Latitude(lat)
+# locationpoint.set_Longitude(lon)
+# self.__estimatedHazardZone.get_BoundaryPoints().append(locationpoint) 
+# [lat,lon]=self.convertxyToLatLon(x4,y4)
+# locationpoint = Location3D()
+# locationpoint.set_Latitude(lat)
+# locationpoint.set_Longitude(lon)
+# self.__estimatedHazardZone.get_BoundaryPoints().append(locationpoint)        
+# self.sendEstimateReport(vstate.ID)
+# self.__estimatedHazardZone = Polygon()
