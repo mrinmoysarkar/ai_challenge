@@ -146,37 +146,37 @@ for i in range(10):
 
 # callfunc(lst[:])
 # print(lst)
-from math import tan,radians
+# from math import tan,radians
 
-x = 3
-y = 5
-a = 7
-b = 8
-eps = 10e-5
-theta = radians(40+eps)
-tn = tan(theta)
-x1 = x + y*tn
-y1 = y + x/tn
+# x = 3
+# y = 5
+# a = 7
+# b = 8
+# eps = 10e-5
+# theta = radians(40+eps)
+# tn = tan(theta)
+# x1 = x + y*tn
+# y1 = y + x/tn
 
-xs1 = (x+x1)/2
-ys1 = y/2
+# xs1 = (x+x1)/2
+# ys1 = y/2
 
-xs2 = x/2
-ys2 = (y+y1)/2
+# xs2 = x/2
+# ys2 = (y+y1)/2
 
-x2 = xs2+(b-ys2)/tn
-y2 = ys1+(a-xs1)*tn
+# x2 = xs2+(b-ys2)/tn
+# y2 = ys1+(a-xs1)*tn
 
-xs3 = (xs2+x2)/2
-ys3 = (ys2+b)/2
+# xs3 = (xs2+x2)/2
+# ys3 = (ys2+b)/2
 
-xs4 = (xs1+a)/2
-ys4 = (ys1+y2)/2
+# xs4 = (xs1+a)/2
+# ys4 = (ys1+y2)/2
 
-import sys
+# import sys
 
-print(sys.version)
-print(sys.executable)
+# print(sys.version)
+# print(sys.executable)
 
 
 
@@ -205,13 +205,67 @@ print(sys.executable)
 
 # print(np.mean(x,axis=0))
 
-datagrid = np.random.randint(0,2,[100,100])
+# datagrid = np.random.randint(0,2,[100,100])
 
-ic = np.random.randint(0,100)
-jc = np.random.randint(0,100)
+# ic = np.random.randint(0,100)
+# jc = np.random.randint(0,100)
 
-w=3
-h=3
+# w=3
+# h=3
 
-x=np.array([[1,2,3],[4,5,6]])
-print(x[:,0:2])
+# x=np.array([1,2,3])
+# y = np.array([4,5,6])
+# print(x+y)
+# print(np.array(x))
+
+
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Mar 25 17:38:05 20
+"""
+
+import numpy as np
+from scipy.spatial.distance import pdist,squareform
+def UpdateSamples(sample,r,Np):
+    sample = np.array(sample)
+    points = sample[:,0:2]
+    Dist = squareform(pdist(points))
+    [Nr,Nc] = np.shape(Dist)
+    UpdateSample = []
+    marked = []
+    for i in range(Nr):
+        if i not in marked:
+            D = Dist[i][:]
+            marked.append(i)
+            temp = []
+            for j in range(Nc):
+                if j not in marked:
+                    if D[j] < r:
+                        temp.append(sample[j,:])
+                        marked.append(j)
+            if np.shape(temp)[0]<Np:
+                temp = sample[i,:]
+                temp = np.array(temp)
+                
+                UpdateSample.append(temp)
+            else:
+                temp = np.array(temp)
+                sorted_Indice = np.argsort(temp[:,2])
+                temp = temp[sorted_Indice,:]
+                UpdateSample.append(temp[-Np:,:])
+            
+    New = UpdateSample   
+    print(New)
+    return New
+
+#sample = {'1':[100,200],'2':[150,200],'3':[50,200],'4':[450,300],'5':[350,300],'6':[450,280],'7':[500,300]}
+sample = [[100,200,1],[150,200,2],[50,200,3],[450,300,4],[350,300,5],[450,280,6],[500,300,7]]
+r = 100
+Np = 1
+
+UpdateSample = UpdateSamples(sample,r,Np)
+
+x= [[2,3,4]]
+print(x)
+x=np.array(x)
+print(x)

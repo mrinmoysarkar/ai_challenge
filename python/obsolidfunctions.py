@@ -1166,3 +1166,34 @@ def recursiveSearch(self,i,j,w,h):
 # self.__estimatedHazardZone.get_BoundaryPoints().append(locationpoint)        
 # self.sendEstimateReport(vstate.ID)
 # self.__estimatedHazardZone = Polygon()
+
+
+
+
+#print('before secondary merge')
+        #print(data.keys())
+        #loop = len(data.keys())-1
+        #for lp in range(loop):
+
+# if newKey != 0:
+#     data = dict(newData)
+# print(data)
+# print("**********************")
+
+# print('data after secondary merge done phase 1')
+# while True:
+#     keys = list(data.keys())
+#     flag = True
+#     for i in range(len(keys)):
+#         for j in range(i+1,len(keys)):
+#             if self.checksubset(data[keys[j]],data[keys[i]]):
+#                 flag = False
+#                 del data[keys[j]]
+#                 print('***************deleting data*******************')
+#                 break
+#         if not flag:
+#             break
+#     if flag:
+#         break
+#print('data after secondary merge')
+#print(data.keys())

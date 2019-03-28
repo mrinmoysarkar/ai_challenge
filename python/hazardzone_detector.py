@@ -193,7 +193,7 @@ class SampleHazardDetector(IDataReceived):
         self.__altitudetype = AltitudeType.MSL
         self.__radiusForDeleteOldSample = 1000
         self.__minimumNumberOfSamplestokeept = 5
-        self.__debug = True
+        self.__debug = False
         
     def dataReceived(self, lmcpObject):
         if self.__debug:
@@ -1348,56 +1348,24 @@ class SampleHazardDetector(IDataReceived):
     def secondaryMerge(self,data):
         if self.__debug:
             print("secondaryMerge enter")
-        #print('before secondary merge')
-        #print(data.keys())
-        #loop = len(data.keys())-1
-        #for lp in range(loop):
+        
         while True:
-            #print('in loop',lp)
             flag = True
             keys = list(data.keys())
-            # newData = {}
-            # newKey = 0
-            # print(keys)
             for i in range(len(keys)):
                 for j in range(i+1,len(keys)):
                     p1 = np.mean(np.array(data[keys[i]]),axis=0)
                     p2 = np.mean(np.array(data[keys[j]]),axis=0)
                     d = np.linalg.norm(p1-p2)
-                    #print(p1,p2,d,self.__secondaryMergeThreshold)
-                    if d <= self.__secondaryMergeThreshold:# and not self.checksubset(data[keys[j]][:],data[keys[i]][:]):
+                    if d <= self.__secondaryMergeThreshold:
                         data[keys[i]] = data[keys[i]] + data[keys[j]]
                         del data[keys[j]]
-                        # print('one data merged')
-                        # newKey += 1
                         flag = False
                         break
                 if not flag:
                     break
             if flag:
-                break        
-            # if newKey != 0:
-            #     data = dict(newData)
-            # print(data)
-            # print("**********************")
-        
-        # print('data after secondary merge done phase 1')
-        # while True:
-        #     keys = list(data.keys())
-        #     flag = True
-        #     for i in range(len(keys)):
-        #         for j in range(i+1,len(keys)):
-        #             if self.checksubset(data[keys[j]],data[keys[i]]):
-        #                 flag = False
-        #                 del data[keys[j]]
-        #                 print('***************deleting data*******************')
-        #                 break
-        #         if not flag:
-        #             break
-        #     if flag:
-        #         break
-        #print('data after secondary merge')
-        #print(data.keys())
+                break           
         if self.__debug:
             print("secondaryMerge exit")
         return dict(data)
@@ -1433,30 +1401,24 @@ class SampleHazardDetector(IDataReceived):
         dist = squareform(pdist(points))
         [Nr,Nc] = np.shape(dist)
         updateSample = []
-        marked = []
+        marked = np.zeros([Nr,Nc])
         for i in range(Nr):
-            if i not in marked:
-                d= dist[i][:]
-                marked.append(i)
-                temp = []
-                for j in range(Nc):
-                    if j not in marked:
-                        if d[j] < r:
-                            temp.append(sample[j,:])
-                            marked.append(j)
-                if np.shape(temp)[0]<Np:
-                    temp = sample[i,:]
-                    temp = np.array(temp)
-                    
-                    updateSample.append(temp)
+            temp = []
+            for j in range(Nc):
+                if marked[i,j] != 1 and dist[i,j] < r:
+                    marked[:,j] = 1
+                    temp.append(sample[j,:])    
+            if temp:
+                temp = np.array(temp)
+                sorted_Indice = np.argsort(temp[:,2])
+                temp = temp[sorted_Indice,:]
+                if temp.shape[0] < Np:
+                    updateSample += list(temp)
                 else:
-                    temp = np.array(temp)
-                    sorted_Indice = np.argsort(temp[:,2])
-                    temp = temp[sorted_Indice,:]
-                    updateSample.append(temp[-Np:,:])
+                    updateSample += list(temp[-Np:,:]) 
         if self.__debug:
             print("updateSamples exit")
-        return updateSample
+        return list(updateSample)
 
     def findBoundaryandSendReport(self):  
         if self.__debug:
@@ -1466,48 +1428,38 @@ class SampleHazardDetector(IDataReceived):
             allxypoints = []
             for key in self.__firezonePoints.keys():
                 points = self.__firezonePoints[key]
-                # self.__firezonePoints[key] = []
                 
                 allxypoints += points
                    
             if len(allxypoints) >= 3:
 
                 pointsInZones = self.mergeFireZones(allxypoints[:])
-                #delete old points
                 data = {}
                 flag = False
                 r = self.__radiusForDeleteOldSample 
                 Np = self.__minimumNumberOfSamplestokeept 
                 for key in pointsInZones.keys():
-                    allxypoints = np.array(self.updateSamples(list(pointsInZones[key]),r,Np)) #np.array(pointsInZones[key])
+                    #print(pointsInZones[key])
+                    allxypoints = np.array(self.updateSamples(list(pointsInZones[key]),r,Np)) #np.array(pointsInZones[key]) ##
                     allxypoints = allxypoints[:,0:2]
-                    # print('points')
-                    # print(allxypoints)
+                    
                     if len(allxypoints) >= 3:
                         boundarypoints = self.graham_scan(list(allxypoints))
                         data[key] = boundarypoints
                         flag = True
+                    pointsInZones[key] = list(allxypoints)
                 if flag:
                     data = self.secondaryMerge(dict(data))
                 else:
                     data = self.secondaryMerge(dict(pointsInZones))
-                #print('data returned',data)
+                
                 for key in data.keys():
-                    allxypoints = np.array(data[key])
-                    allxypoints = allxypoints[:,0:2]
-                    # print('points')
-                    # print(allxypoints)
+                    allxypoints = data[key]
+                    
                     if len(allxypoints) >= 3:
-                        #print('what is that 2',allxypoints)
+                        
                         boundarypoints = self.graham_scan(list(allxypoints))
                         
-                        #print('boundary points')
-                        # print(boundarypoints)
-                        # self.__firezonePoints[key] = boundarypoints
-                        # if self.__wspeed != 0:
-                        #     boundarypoints = self.translateEstimatedShape(self.__wspeed,self.__ditectionTheta,boundarypoints[:])
-                        #     # boundarypoints = self.__firezonePoints[key]
-                        #     reset = True
                         for xypoint in boundarypoints:
                             [lat,lon]=self.convertxyToLatLon(xypoint[0],xypoint[1])
                             locationpoint = Location3D()
@@ -1516,9 +1468,7 @@ class SampleHazardDetector(IDataReceived):
                             self.__estimatedHazardZone.get_BoundaryPoints().append(locationpoint)             
                         self.sendEstimateReport(key)
                         self.__estimatedHazardZone = Polygon()
-            # if reset:
-            #     self.__wspeed = 0
-            #     self.__ditectionTheta = 0
+            
             if self.__debug:
                 print("findBoundaryandSendReport exit")  
 
