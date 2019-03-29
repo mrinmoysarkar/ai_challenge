@@ -145,7 +145,7 @@ class SampleHazardDetector(IDataReceived):
         self.__maxSpeedGlobal = 0
         self.__sensorMaxrange = {}
         self.__windspeedupdateTime = 2000 #in milisecond
-        self.__maxsurvayUAVForzone = 3
+        self.__maxsurvayUAVForzone = 2
         self.__maxSpeedForsurvey = 25
         self.__surveyCircleRadius = 1000
         self.__searchCircleRadius = 3000
@@ -162,15 +162,15 @@ class SampleHazardDetector(IDataReceived):
         self.__initialSmallGridH = 0
         self.__uavInSmokemisssion = {}
         self.__uavisHeadingtoSmokeSurveylocation = {}
-        self.__energyThreshold = 70
-        self.__energyThresholddist = 1500
+        self.__energyThreshold = 90
+        self.__energyThresholddist = 4000 #3000
         self.__maxSpeedofUAVduringSurvey = {}
         self.__energyconsumptionRate = 0.1
         self.__mapHold = {}
         self.__secondarysearchareaW = 10000 #in meter
         self.__secondarysearchareaH = 10000 #in meter
         self.__altitudetype = AltitudeType.AGL
-        self.__radiusForDeleteOldSample = 200
+        self.__radiusForDeleteOldSample = 100
         self.__minimumNumberOfSamplestokeept = 10
         self.__debug = False
         
@@ -672,6 +672,15 @@ class SampleHazardDetector(IDataReceived):
             print("convertxyToLatLon exit")
         return [lat,long]
      
+    def getCenterofRecoveryZone(self):
+        ##############
+        allxypoints = []
+        for recovepoint in self.__recoveryPoints:
+            [x,y] = self.convertLatLonToxy(recovepoint.CenterPoint.get_Latitude(),recovepoint.CenterPoint.get_Longitude())
+            allxypoints.append([x,y])
+        centerForSearch = np.mean(np.array(allxypoints),axis=0)
+        print(centerForSearch)
+
     def GenerateSamplePointsOnACircle(self,x,y,r):
         if self.__debug:
             print("GenerateSamplePointsOnACircle enter")
@@ -1890,7 +1899,7 @@ class SampleHazardDetector(IDataReceived):
 #################
 
 if __name__ == '__main__':
-    myHost = 'localhost' #'13.77.73.31' #'localhost' #
+    myHost = 'localhost' # '13.77.73.31'
     myPort = 5555
     amaseClient = AmaseTCPClient(myHost, myPort)
     #amaseClient.addReceiveCallback(PrintLMCPObject())
@@ -1917,6 +1926,9 @@ if __name__ == '__main__':
                 if not smpleHazardDetector.getMissionReadyStatus():
                     smpleHazardDetector.calculateGridCoordinate()
                     smpleHazardDetector.sendinitialMission()
+                    smpleHazardDetector.getCenterofRecoveryZone()
+
+
                 if smpleHazardDetector.getupdateAreaStatus():
                     smpleHazardDetector.updateEstimatedArea()
                     smpleHazardDetector.setupdateAreaStatus(False)
