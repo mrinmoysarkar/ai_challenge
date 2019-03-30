@@ -26,7 +26,6 @@ class SampleHazardDetector(IDataReceived):
         self.__estimatedHazardZone = Polygon()
 
     def dataReceived(self, lmcpObject):
-        print(lmcpObject.toXMLStr(""))
         if isinstance(lmcpObject, HazardZoneDetection):
             hazardDetected = lmcpObject
             #Get location where zone first detected
@@ -92,7 +91,7 @@ class SampleHazardDetector(IDataReceived):
 #################
 
 if __name__ == '__main__':
-    myHost = '13.77.73.31'#'localhost'
+    myHost = 'localhost'
     myPort = 5555
     amaseClient = AmaseTCPClient(myHost, myPort)
     #amaseClient.addReceiveCallback(PrintLMCPObject())
