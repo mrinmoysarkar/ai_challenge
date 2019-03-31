@@ -1,0 +1,1 @@
+if ((smpleHazardDetector.getSimTime()>17*60*1000 and smpleHazardDetector.getSimTime()<22*60*1000) or (smpleHazardDetector.getSimTime()>37*60*1000 and smpleHazardDetector.getSimTime()<42*60*1000) or (smpleHazardDetector.getSimTime()>57*60*1000)) and smpleHazardDetector.getSendReportStatus() and (time.time() - previousReportingtime) > reportingTime:

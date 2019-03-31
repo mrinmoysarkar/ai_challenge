@@ -145,11 +145,12 @@ class SampleHazardDetector(IDataReceived):
         self.__uavsInZone = {}
         self.__maxSpeedGlobal = 0
         self.__sensorMaxrange = {}
-        self.__windspeedupdateTime = 2000 #in milisecond
+        self.__windspeedupdateTime = 500 #in milisecond
         self.__maxsurvayUAVForzone = 2
         self.__maxSpeedForsurvey = 25
+        self.__maxSpeedForsearch = 30
         self.__surveyCircleRadius = 1000
-        self.__searchCircleRadius = 6000 # 3000
+        self.__searchCircleRadius = 6000 #3000
         self.__uavRecharging = {}
 
         self.__secondaryMergeThreshold = 0
@@ -164,7 +165,7 @@ class SampleHazardDetector(IDataReceived):
         self.__uavInSmokemisssion = {}
         self.__uavisHeadingtoSmokeSurveylocation = {}
         self.__energyThreshold = 90
-        self.__energyThresholddist = 5000 # 6000
+        self.__energyThresholddist = 6000 # 6000
         self.__maxSpeedofUAVduringSurvey = {}
         self.__energyconsumptionRate = 0.1
         self.__mapHold = {}
@@ -174,7 +175,9 @@ class SampleHazardDetector(IDataReceived):
         self.__radiusForDeleteOldSample = 200 # 200
         self.__minimumNumberOfSamplestokeept = 10
         self.__debug = False
-        
+        self.__zoneCounter = 1
+        self.__secondarymergeratio = 0.37
+
     def dataReceived(self, lmcpObject):
         if self.__debug:
             print("dataReceived enter")
@@ -299,7 +302,7 @@ class SampleHazardDetector(IDataReceived):
             i = i+1
             alti = max(waypointaltimap[waypoint.get_Number()], waypointaltimap[waypoint.get_NextWaypoint()], waypointaltimap[waypointconnectingmap[waypoint.get_NextWaypoint()]])
             waypoint.set_Altitude(alti + safeHeight)
-            waypoint.set_Speed(self.__maxSpeedofUAV[veicleid])
+            waypoint.set_Speed(self.__maxSpeedForsearch)#self.__maxSpeedofUAV[veicleid])
             missionCommand.get_WaypointList().append(waypoint)
 
         self.__totalWaypointsassignedToUAV[veicleid] = i
@@ -334,10 +337,14 @@ class SampleHazardDetector(IDataReceived):
             i += 1
             if torecharge:
                 alti = max(list(waypointaltimap.values()))
+                alti = alti + 100 #max(alti,2500)
             else:
                 alti = max(waypointaltimap[waypoint.get_Number()], waypointaltimap[waypoint.get_NextWaypoint()], waypointaltimap[waypointconnectingmap[waypoint.get_NextWaypoint()]])
             waypoint.set_Altitude(alti + safeHeight)
-            waypoint.set_Speed(self.__maxSpeedofUAV[veicleid])
+            if not torecharge:
+                waypoint.set_Speed(self.__maxSpeedForsearch)
+            else:
+                waypoint.set_Speed(self.__maxSpeedofUAV[veicleid])
             missionCommand.get_WaypointList().append(waypoint)
 
         self.__totalWaypointsassignedToUAV[veicleid] = i
@@ -367,7 +374,7 @@ class SampleHazardDetector(IDataReceived):
             i += 1
             alti = max(waypointaltimap[waypoint.get_Number()], waypointaltimap[waypoint.get_NextWaypoint()], waypointaltimap[waypointconnectingmap[waypoint.get_NextWaypoint()]])
             waypoint.set_Altitude(alti + safeHeight)
-            waypoint.set_Speed(self.__maxSpeedofUAV[veicleid])
+            waypoint.set_Speed(self.__maxSpeedForsearch)#self.__maxSpeedofUAV[veicleid])
             missionCommand.get_WaypointList().append(waypoint)
 
         self.__totalWaypointsassignedToUAV[veicleid] = i
@@ -482,6 +489,7 @@ class SampleHazardDetector(IDataReceived):
                     self.zoneassigned[minzid] = True 
         if self.__debug:
             print("sendinitialMission exit") 
+    
     def sendSmokeZonemission(self,vstate):
         if self.__debug:
             print("sendSmokeZonemission enter")
@@ -531,7 +539,7 @@ class SampleHazardDetector(IDataReceived):
                 waypoint.set_NextWaypoint(1)
             else:
                 waypoint.set_NextWaypoint(i+1)
-            waypoint.set_Speed(self.__maxSpeedofUAV[vid])
+            waypoint.set_Speed(self.__maxSpeedForsearch)#self.__maxSpeedofUAV[vid])
             waypoint.set_SpeedType(SpeedType.Airspeed)
             waypoint.set_ClimbRate(0)
             waypoint.set_TurnType(TurnType.TurnShort)
@@ -601,7 +609,7 @@ class SampleHazardDetector(IDataReceived):
         if r==0:
             r = self.__surveyCircleRadius
         if speed == 0:
-            speed = self.__maxSpeedofUAV[veicleid]
+            speed = self.__maxSpeedForsearch#self.__maxSpeedofUAV[veicleid]
         points = self.GenerateSamplePointsOnACircleforSurvey(xc,yc,r,vstate.Heading,direction)
         vid = vstate.ID
         safeHeight = abs(self.__sensorMaxrange[vid] * sin(radians(vstate.PayloadStateList[0].Elevation))) - self.__safeHeight
@@ -660,7 +668,8 @@ class SampleHazardDetector(IDataReceived):
                 return 
 
             for uav in self.__airvehicleConfigList:
-                if (not uav.ID in self.__uavsInSearch) and (not uav.ID in self.__uavsInSarvey) and (not uav.ID in self.__uavisHeadingtoSurveylocation) and (self.__maxSpeedGlobal > uav.MaximumSpeed):
+                # if (not uav.ID in self.__uavsInSearch) and (not uav.ID in self.__uavsInSarvey) and (not uav.ID in self.__uavisHeadingtoSurveylocation) and (self.__maxSpeedGlobal > uav.MaximumSpeed):
+                if (not uav.ID in self.__uavsInSarvey) and (not uav.ID in self.__uavisHeadingtoSurveylocation):
                     vstate1 = self.getAirVeicleState(uav.ID)
                     d = self.getdistance(vstate.Location,vstate1.Location)
                     if d < mind:
@@ -713,6 +722,16 @@ class SampleHazardDetector(IDataReceived):
             yi = r * sin(radians(angle))
             Cx = x + xi
             Cy = y + yi
+            if abs(Cx) > self.__searchAreaWidth:
+                if Cx < 0:
+                    Cx = -self.__searchAreaWidth
+                else:
+                    Cx = self.__searchAreaWidth
+            if abs(Cy) > self.__searchAreaWidth:
+                if Cy < 0:
+                    Cy = -self.__searchAreaHeight
+                else:
+                    Cy = self.__searchAreaHeight
             Points.append([Cx,Cy])
         if self.__debug:
             print("GenerateSamplePointsOnACircle exit")
@@ -738,6 +757,16 @@ class SampleHazardDetector(IDataReceived):
             yi = r * sin(radians(angle))
             Cx = xc + xi
             Cy = yc + yi
+            if abs(Cx) > self.__searchAreaWidth:
+                if Cx < 0:
+                    Cx = -self.__searchAreaWidth
+                else:
+                    Cx = self.__searchAreaWidth
+            if abs(Cy) > self.__searchAreaWidth:
+                if Cy < 0:
+                    Cy = -self.__searchAreaHeight
+                else:
+                    Cy = self.__searchAreaHeight
             Points.append([Cx,Cy])
         if self.__debug:
             print("GenerateSamplePointsOnACircleforSurvey exit")
@@ -765,7 +794,7 @@ class SampleHazardDetector(IDataReceived):
         dh = h/hSeg
         currCenterx = -w/2
         currCentery = -h/2
-        self.__secondaryMergeThreshold = 0.7*max(dw,dh) # min
+        self.__secondaryMergeThreshold = self.__secondarymergeratio*min(dw,dh) # min
         for ws in range(wSeg):
             for hs in range(hSeg):
                 zoneid = ws*hSeg + hs + 1
@@ -1385,10 +1414,10 @@ class SampleHazardDetector(IDataReceived):
         allxypoints = np.array(allxypoints)
         allxypoints = allxypoints[:,0:2]
         allxypoints = StandardScaler().fit_transform(allxypoints)
-        clustering = MeanShift().fit(allxypoints)
+        clustering = MeanShift(bandwidth=0.5).fit(allxypoints)
         labels = np.array(clustering.labels_)
         uniquelabels = np.unique(labels)
-        print(uniquelabels)
+        # print(uniquelabels)
         pointsInZones = {}
         for label in uniquelabels:
             condition = labels==label
@@ -1674,7 +1703,17 @@ class SampleHazardDetector(IDataReceived):
                     self.__uavisHeadingtoSurveylocation[vid] = True
             else:
                 self.getNewAreaforSearch(vstate)
-                self.__uavsInSearch[vid] = True
+                self.__uavsInSearch[vstate.ID] = True
+                ####
+                # self.__zoneCounter += 1
+                # zid = self.__zoneCounter%self.__noOfZone+1
+                
+                # endLoc = self.__zoneCenter[zid]
+                # startLoc =  vstate.Location
+                           
+                # self.__uavsInMission[vstate.ID] = True
+                # self.sendWaypoint(vstate.ID,startLoc,endLoc) 
+                
         elif not self.__uavsInMission[vstate.ID] and vstate.EnergyAvailable > 99:
             # self.getNewAreaforSearch(vstate)
 
@@ -1752,8 +1791,8 @@ class SampleHazardDetector(IDataReceived):
                 self.__uavsInSarvey[veicleid] = False
                 self.__uavisHeadingtoSurveylocation[veicleid] = False
                 self.sendWaypoint(veicleid, Location, RecoveryPos, radius=radius,torecharge=True)
-#                print("Uav",veicleid," has a remaining distance of ",MaximumDistLeft)
-#                print("The closest distance to the recovery region is ",Dist[MinIndice])
+               # print("Uav",veicleid," has a remaining distance of ",MaximumDistLeft)
+               # print("The closest distance to the recovery region is ",Dist[MinIndice])
                 #print('uav',veicleid,'recharging')
                 # if veicleid == 10:
                 #     print('uav survey status is reseted 2')

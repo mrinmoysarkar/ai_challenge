@@ -145,7 +145,7 @@ class SampleHazardDetector(IDataReceived):
         self.__maxSpeedGlobal = 0
         self.__sensorMaxrange = {}
         self.__windspeedupdateTime = 2000 #in milisecond
-        self.__maxsurvayUAVForzone = 2
+        self.__maxsurvayUAVForzone = 3
         self.__maxSpeedForsurvey = 25
         self.__surveyCircleRadius = 1000
         self.__searchCircleRadius = 3000
@@ -334,7 +334,7 @@ class SampleHazardDetector(IDataReceived):
         for waypoint in waypoints:
             i += 1
             if torecharge:
-                alti = max(list(waypointaltimap.values()))
+                alti = 3000#max(list(waypointaltimap.values()))
             else:
                 alti = max(waypointaltimap[waypoint.get_Number()], waypointaltimap[waypoint.get_NextWaypoint()], waypointaltimap[waypointconnectingmap[waypoint.get_NextWaypoint()]])
             waypoint.set_Altitude(alti + safeHeight)

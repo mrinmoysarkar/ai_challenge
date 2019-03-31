@@ -773,7 +773,7 @@ class SampleHazardDetector(IDataReceived):
         
         currCenterx = -w/2
         currCentery = -h/2
-        self.__secondaryMergeThreshold = 0.7*min(dw,dh)
+        self.__secondaryMergeThreshold = 1.0*min(dw,dh)
         for ws in range(wSeg):
             for hs in range(hSeg):
                 zoneid = ws*hSeg + hs + 1
