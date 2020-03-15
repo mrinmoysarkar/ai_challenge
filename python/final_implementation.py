@@ -68,14 +68,9 @@ class SampleHazardDetector(IDataReceived):
 
     def __init__(self, tcpClient):
         self.__client = tcpClient
-        
-        
-        
         self.__estimatedHazardZone = Polygon()
         self.__keepInZone = Rectangle()
         self.__currentLocationofUAV = {}
-        
-        
         self.__searchAreaCenterLat = 0
         self.__searchAreaCenterLong = 0
         self.__searchAreaWidth = 0
@@ -84,35 +79,19 @@ class SampleHazardDetector(IDataReceived):
         self.__firezoneHintLocation = {}
         self.__centerLocation = Location3D()
         self.__gotHint = False
-        
-        
-        
-        
-        
         self.anchor = []
-        
-        
-        
-        
         self.__noOfUAVs = 0
         self.__sendReport = False
-        
         self.__maxSpeedofUAV = {}
-        
         self.__resulationOfGrid = 1000
         self.__minidel = 500
-        
-        
         self.__waypoints = {}
         self.__uavsInMission = {}
         self.__MissionReady = False
         self.__noOfZone = 0
         self.__zoneassigned = {}
-        
-        
         self.__zoneCenter = {}
         self.__zoneboundaryPoints = {}
-        
         self.altidata1 = pd.read_csv(filePath+'altidata1.csv',header=None)
         self.altidata1 = self.altidata1.T
         self.altidata2 = pd.read_csv(filePath+'altidata2.csv',header=None)
@@ -121,13 +100,10 @@ class SampleHazardDetector(IDataReceived):
         self.altidata3 = self.altidata3.T
         self.altidata4 = pd.read_csv(filePath+'altidata4.csv',header=None)
         self.altidata4 = self.altidata4.T
-
-        self.__safeHeight = 100 # this value is substracted from the max range of the sensor
+        self.__safeHeight = 150 # this value is substracted from the max range of the sensor
         self.__surveySafeHeight = 300
         self.__normalSearchAltitude = 450
-        
         self.__initLocationOfUAVs = {}
-        
         self.__maxAzimuthangle = {}
         self.__minAzimuthangle = {}
         self.__uavsInSearch = {}
@@ -135,25 +111,14 @@ class SampleHazardDetector(IDataReceived):
         self.__uavisHeadingtoSurveylocation = {}
         self.__uavisInsmokeZone = {}
         self.__UAVSurvayingZoneId = {}
-        
-        
-        
-        
         self.__previousreportsendTime = 0
         self.__previousWeatherReportTime = 0
-        
-        
         self.__wspeed = 0
         self.__ditectionTheta = 0
-        
-        
-        
         self.__totalWaypointsassignedToUAV = {}
         self.__previouswaypointNo = {}
         self.__visitedTotalwaypoints = {}
         self.__updateArea = False
-        
-       
         self.__currentVicleState = {}
         self.__simulationTimemilliSeconds = 0
         self.__hazardSensorStatus = {}
@@ -166,13 +131,12 @@ class SampleHazardDetector(IDataReceived):
         self.__uavsInZone = {}
         self.__maxSpeedGlobal = 0
         self.__sensorMaxrange = {}
-        self.__windspeedupdateTime = 300 #in milisecond 155
+        self.__windspeedupdateTime = 1200#300 #in milisecond 155
         self.__maxsurvayUAVForzone = 3
         self.__maxSpeedForsurvey = 20
         self.__surveyCircleRadius = 1000
         self.__searchCircleRadius = 5000 # 3000
         self.__uavRecharging = {}
-
         self.__secondaryMergeThreshold = 0
         self.__globalMap = None
         self.__dgrid = None
@@ -601,6 +565,11 @@ class SampleHazardDetector(IDataReceived):
             r = self.__surveyCircleRadius
         if speed == 0:
             speed = self.__maxSpeedofUAV[veicleid]
+        if self.getSurveyStatus(veicleid):
+            r = r*2
+            print('doubling')
+
+
         points = self.GenerateSamplePointsOnACircleforSurvey(xc,yc,r,vstate.Heading,direction)
         vid = vstate.ID
         safeHeight = abs(self.__sensorMaxrange[vid] * sin(radians(vstate.PayloadStateList[0].Elevation))) - self.__safeHeight
@@ -660,7 +629,7 @@ class SampleHazardDetector(IDataReceived):
 
             for uav in self.__airvehicleConfigList:
                 # if (not uav.ID in self.__uavsInSearch) and (not uav.ID in self.__uavsInSarvey) and (not uav.ID in self.__uavisHeadingtoSurveylocation) and (self.__maxSpeedGlobal > uav.MaximumSpeed):
-                if (not uav.ID in self.__uavsInSarvey) and (not uav.ID in self.__uavisHeadingtoSurveylocation) and (self.__maxSpeedGlobal >= uav.MaximumSpeed):
+                if (not uav.ID in self.__uavsInSarvey) and (not uav.ID in self.__uavisHeadingtoSurveylocation) and (self.__maxSpeedGlobal > uav.MaximumSpeed):
 
                     vstate1 = self.getAirVeicleState(uav.ID)
                     d = self.getdistance(vstate.Location,vstate1.Location)
@@ -670,6 +639,7 @@ class SampleHazardDetector(IDataReceived):
                         minLoc = vstate1.Location
             # print("mind: ",mind)
             if vid != -1 and (mind**0.5) < 100000:
+                print("vid: ", vid)
                 self.__uavisHeadingtoSurveylocation[vid] = True
                 self.__UAVSurvayingZoneId[vid] = zid
                 self.__uavsInZone[zid].append(vid)
@@ -801,7 +771,7 @@ class SampleHazardDetector(IDataReceived):
                 
                 
                 
-                 # proposed pattern
+                # proposed pattern
                 if ws%2==0:
                     if hs%2 == 0:
                         wpoints,waypointNumber = self.getBetweenLatLonwithoutVIDAlt(currCenterx,currCentery,currCenterx+dw,currCentery+dh,2,0)
@@ -843,6 +813,7 @@ class SampleHazardDetector(IDataReceived):
 
                 # proposed search end
                 
+                
                 '''
                 
                 #creeping line search
@@ -877,7 +848,7 @@ class SampleHazardDetector(IDataReceived):
                 #creeping search end
                 '''
                 
-
+                
                 '''
                 #expanding square start
                 n = 10
@@ -2025,7 +1996,7 @@ if __name__ == '__main__':
 
     try:
         # make a threaded client, listen until a keyboard interrupt (ctrl-c)
-        #start client thread
+        # start client thread
         amaseClient.start()
 
         dt = 0.5
