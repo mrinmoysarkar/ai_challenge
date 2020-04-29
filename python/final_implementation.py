@@ -54,7 +54,11 @@ from sklearn import metrics
 from sklearn.preprocessing import StandardScaler
 from scipy.spatial.distance import pdist,squareform
 
+from sympy import Polygon as poly
+
 import cv2
+
+import matplotlib.pyplot as plt
 
 # import utm
 
@@ -159,7 +163,10 @@ class SampleHazardDetector(IDataReceived):
         self.__minimumNumberOfSamplestokeept = 5
         self.__debug = False
         self.__uavWasSurveying = {}
-        
+        self.__trueHazardZone = {}
+        self.__directions = {}
+
+
     def dataReceived(self, lmcpObject):
         if self.__debug:
             print("dataReceived enter")
@@ -266,6 +273,37 @@ class SampleHazardDetector(IDataReceived):
                 # print('smoke detected')
                 self.__uavisInsmokeZone[detectingEntity] = True
             #     pass
+        
+        elif isinstance(lmcpObject, HazardZone):
+            if lmcpObject.get_ZoneType() == HazardType.Fire:
+                allboundaryPoints = []
+                # origin = self.convertLatLonToxy(39.4952,-121.4558)
+                for loc in lmcpObject.get_Boundary().get_BoundaryPoints():
+                    xy = self.convertLatLonToxy(loc.get_Latitude(),loc.get_Longitude())
+                    # allboundaryPoints.append(tuple(xy))
+                    allboundaryPoints.append(np.array(xy))
+                # print(self.__trueHazardZone)
+                # t = tuple(allboundaryPoints)
+                # p1 = poly(*t)
+                # self.__trueHazardZone[lmcpObject.get_ZoneID()] = p1
+                # print("area:",lmcpObject.get_ZoneID(),float(p1.area))
+                allboundaryPoints = np.int32(np.array(allboundaryPoints)/10)
+                self.__trueHazardZone[lmcpObject.get_ZoneID()] = allboundaryPoints
+                # print(allboundaryPoints)
+                # print(np.max(allboundaryPoints[:,0]),np.max(allboundaryPoints[:,1]))
+                # origin = np.array([np.min(allboundaryPoints[:,0]),np.min(allboundaryPoints[:,1])])
+                # newboundary = allboundaryPoints-origin
+                # w,h = np.max(newboundary[:,0]),np.max(newboundary[:,1])
+                # img = np.zeros((w,h),dtype=np.uint8)
+                # cv2.fillPoly(img,[newboundary],255)
+                # plt.imshow(img,cmap='gray')
+                # plt.show()
+                # # print(newboundary)
+
+        else:
+            # print(lmcpObject)
+            pass
+
         if self.__debug:
             print("dataReceived exit")
     
@@ -567,8 +605,8 @@ class SampleHazardDetector(IDataReceived):
             speed = self.__maxSpeedofUAV[veicleid]
         if self.getSurveyStatus(veicleid):
             r = r*2
-            print('doubling')
-
+            # print('doubling')
+        # print("vehicle id: ", veicleid, "direction: ", direction)
 
         points = self.GenerateSamplePointsOnACircleforSurvey(xc,yc,r,vstate.Heading,direction)
         vid = vstate.ID
@@ -629,7 +667,7 @@ class SampleHazardDetector(IDataReceived):
 
             for uav in self.__airvehicleConfigList:
                 # if (not uav.ID in self.__uavsInSearch) and (not uav.ID in self.__uavsInSarvey) and (not uav.ID in self.__uavisHeadingtoSurveylocation) and (self.__maxSpeedGlobal > uav.MaximumSpeed):
-                if (not uav.ID in self.__uavsInSarvey) and (not uav.ID in self.__uavisHeadingtoSurveylocation) and (self.__maxSpeedGlobal > uav.MaximumSpeed):
+                if (not uav.ID in self.__uavsInSarvey) and (not uav.ID in self.__uavisHeadingtoSurveylocation):# and (self.__maxSpeedGlobal > uav.MaximumSpeed):
 
                     vstate1 = self.getAirVeicleState(uav.ID)
                     d = self.getdistance(vstate.Location,vstate1.Location)
@@ -1168,6 +1206,7 @@ class SampleHazardDetector(IDataReceived):
         return map,wpointconnectmap
 
     def getAltitudeLatLon(self,lat,lon):
+        # return 0
         if self.__debug:
             print("getAltitudeLatLon enter")
         if (lat - 39.0) <= 1:
@@ -1229,6 +1268,7 @@ class SampleHazardDetector(IDataReceived):
         return Altitude
     
     def getAltitude(self,location):
+        # return 0
         if self.__debug:
             print("getAltitude enter")
         lat = location.get_Latitude()
@@ -1497,8 +1537,10 @@ class SampleHazardDetector(IDataReceived):
 
     def findBoundaryandSendReport(self):  
         if self.__debug:
-            print("findBoundaryandSendReport enter")      
-        if self.__firezonePoints:
+            print("findBoundaryandSendReport enter") 
+        t1 = self.getSimTime()/60000
+
+        if self.__firezonePoints and ((t1>20 and t1<23) or (t1>40 and t1<43) or (t1>57 and t1<61) or t1 > 87):
             reset = False
             allxypoints = []
             for key in self.__firezonePoints.keys():
@@ -1523,17 +1565,30 @@ class SampleHazardDetector(IDataReceived):
                         data[key] = boundarypoints
                         flag = True
                     pointsInZones[key] = list(allxypoints)
-                if flag:
-                    data = self.secondaryMerge(dict(data))
-                else:
-                    data = self.secondaryMerge(dict(pointsInZones))
-                
+                # if flag:
+                #     data = self.secondaryMerge(dict(data))
+                # else:
+                #     data = self.secondaryMerge(dict(pointsInZones))
+
                 for key in data.keys():
                     allxypoints = data[key]
-                    
+
                     if len(allxypoints) >= 3:
-                        
                         boundarypoints = self.graham_scan(list(allxypoints))
+                        self.calculate_area(t1, boundarypoints)
+                        # print('all xy points:',boundarypoints)
+                        
+                        # plt.subplot(2,1,1)
+                        # plt.imshow(img_t,cmap='gray')
+                        # plt.subplot(2,1,2)
+                        # plt.imshow(img_e,cmap='gray')
+                        # plt.show()
+                        # t=tuple(corresponding_poly[1].intersection(p1))
+                        # print('length t: ',len(t))
+                        # if len(t)>3:
+                        #     inter_poly=poly(*t)
+                        #     print("sim time(minutes): ",t1," zone id: ",corresponding_poly[0]," true area: ",float(corresponding_poly[1].area)," estimated area: ", float(p1.area), "intersection area : ",float(inter_poly.area))
+
                         
                         for xypoint in boundarypoints:
                             [lat,lon]=self.convertxyToLatLon(xypoint[0],xypoint[1])
@@ -1546,6 +1601,41 @@ class SampleHazardDetector(IDataReceived):
             
             if self.__debug:
                 print("findBoundaryandSendReport exit")  
+
+    def calculate_area(self,tim,estimated_boundary_points):
+        # if tim>60:
+        #     return
+        boundarypoints_new = np.int32(np.array(estimated_boundary_points)/10)
+        t = tuple(boundarypoints_new)
+        p1 = poly(*t)
+        # print('estimated area', float(p1.area))
+        poly_min_dis = 10e20
+        corresponding_poly = [] 
+        # print(self.__trueHazardZone)
+        for key,value in self.__trueHazardZone.items():
+            t2 = tuple(value)
+            p2 = poly(*t2)
+            poly_dis = p1.centroid.distance(p2.centroid)
+            if poly_min_dis > poly_dis:
+                poly_min_dis = poly_dis
+                corresponding_poly = [key,value]
+        print(boundarypoints_new.shape)
+        minx,miny=min(np.min(boundarypoints_new[:,0]),np.min(corresponding_poly[1][:,0])), min(np.min(boundarypoints_new[:,1]),np.min(corresponding_poly[1][:,1]))
+        corresponding_poly[1] -= np.array([minx,miny])
+        boundarypoints_new -= np.array([minx,miny])
+        w,h = max(np.max(boundarypoints_new[:,0]),np.max(corresponding_poly[1][:,0])), max(np.max(boundarypoints_new[:,1]),np.max(corresponding_poly[1][:,1]))
+        img_t = np.zeros([w,h],dtype=np.uint8)
+        img_e = np.zeros([w,h],dtype=np.uint8)
+        cv2.fillPoly(img_t,[corresponding_poly[1]],1)
+        cv2.fillPoly(img_e,[boundarypoints_new],1)
+        overlap_img = cv2.bitwise_and(img_e,img_t)
+        area_t = np.sum(img_t)
+        area_e = np.sum(img_e)
+        area_o = np.sum(overlap_img)
+        coverage = (area_o/area_t)*100
+        iou = area_o/(area_t+area_e-area_o)
+        print('time in munutes: ', tim, ' true area: ',area_t,' estim area: ', area_e, ' overlap area: ', area_o, ' coverage percent: ',coverage)
+        print('firezone id', corresponding_poly[0],' IOU: ', iou)
 
     def getSendReportStatus(self):
         # return self.__sendReport
@@ -1668,16 +1758,21 @@ class SampleHazardDetector(IDataReceived):
     def getSurveyDirection(self,vid):
         if self.__debug:
             print("getSurveyDirection enter")
-        zid = self.__UAVSurvayingZoneId[vid]
-        uavlist = self.__uavsInZone[zid]
-        indx = uavlist.index(vid)
-        if indx%2 == 0:
+        if vid in self.__directions:
+            return self.__directions[vid]
+        else:
+            zid = self.__UAVSurvayingZoneId[vid]
+            uavlist = self.__uavsInZone[zid]
+            indx = uavlist.index(vid)
+            if indx%2 == 0:
+                if self.__debug:
+                    print("getSurveyDirection exit")
+                self.__directions[vid] = 0
+                return 0
             if self.__debug:
                 print("getSurveyDirection exit")
-            return 0
-        if self.__debug:
-            print("getSurveyDirection exit")
-        return 1
+            self.__directions[vid] = 1
+            return 1
 
     def isMissionComplete(self,vstate):
         if self.__debug:
@@ -1973,7 +2068,8 @@ class SampleHazardDetector(IDataReceived):
         return False,[]
 
     def saveMAP(self):
-         cv2.imwrite("globalMap.png", self.__globalMap*255)
+         # cv2.imwrite("globalMap.png", self.__globalMap*255)
+         pass
 
     def getsurveyspeed(self,vstate):
         return self.__maxSpeedofUAVduringSurvey[vstate.ID]

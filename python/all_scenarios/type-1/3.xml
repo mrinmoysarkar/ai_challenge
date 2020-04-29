@@ -5,7 +5,7 @@
     <SimulationView LongExtent="1.0703" Latitude="39.8058" Longitude="-121.0853"/>
     <ScenarioName>Challenge 2 Competition Scenario</ScenarioName>
     <Date>24/04/2008:00:00:00</Date>
-    <ScenarioDuration>3601.08</ScenarioDuration>
+    <ScenarioDuration>7201.08</ScenarioDuration>
   </ScenarioData>
   <ScenarioEventList>
     <KeepInZone Series="CMASI">

@@ -5,7 +5,7 @@
     <SimulationView LongExtent="0.5" Latitude="1.4927" Longitude="-132.5372"/>
     <ScenarioName>Challenge 2A Practice Scenario</ScenarioName>
     <Date>24/04/2008:00:00:00</Date>
-    <ScenarioDuration>3601.08</ScenarioDuration>
+    <ScenarioDuration>5401.08</ScenarioDuration>
   </ScenarioData>
   <ScenarioEventList>
     <KeepInZone Series="CMASI">
@@ -35,6 +35,7 @@
         </Rectangle>
       </Boundary>
     </KeepInZone>
+
     <AirVehicleConfiguration Time="0.0" Series="CMASI">
       <MinimumSpeed>15.0</MinimumSpeed>
       <MaximumSpeed>35.0</MaximumSpeed>
@@ -138,7 +139,7 @@
           <Parameters/>
         </CameraConfiguration>
         <HazardSensorConfiguration Series="SEARCHAI">
-          <MaxRange>500.0</MaxRange>
+          <MaxRange>1500.0</MaxRange>
           <HorizontalFOV>10.0</HorizontalFOV>
           <VerticalFOV>10.0</VerticalFOV>
           <DetectableHazardTypes>
@@ -324,7 +325,7 @@
           <Parameters/>
         </CameraConfiguration>
         <HazardSensorConfiguration Series="SEARCHAI">
-          <MaxRange>500.0</MaxRange>
+          <MaxRange>1500.0</MaxRange>
           <HorizontalFOV>10.0</HorizontalFOV>
           <VerticalFOV>10.0</VerticalFOV>
           <DetectableHazardTypes>
@@ -510,7 +511,7 @@
           <Parameters/>
         </CameraConfiguration>
         <HazardSensorConfiguration Series="SEARCHAI">
-          <MaxRange>500.0</MaxRange>
+          <MaxRange>1500.0</MaxRange>
           <HorizontalFOV>10.0</HorizontalFOV>
           <VerticalFOV>10.0</VerticalFOV>
           <DetectableHazardTypes>
@@ -696,7 +697,7 @@
           <Parameters/>
         </CameraConfiguration>
         <HazardSensorConfiguration Series="SEARCHAI">
-          <MaxRange>500.0</MaxRange>
+          <MaxRange>1500.0</MaxRange>
           <HorizontalFOV>10.0</HorizontalFOV>
           <VerticalFOV>10.0</VerticalFOV>
           <DetectableHazardTypes>
@@ -882,7 +883,7 @@
           <Parameters/>
         </CameraConfiguration>
         <HazardSensorConfiguration Series="SEARCHAI">
-          <MaxRange>500.0</MaxRange>
+          <MaxRange>1500.0</MaxRange>
           <HorizontalFOV>10.0</HorizontalFOV>
           <VerticalFOV>10.0</VerticalFOV>
           <DetectableHazardTypes>
@@ -1068,7 +1069,7 @@
           <Parameters/>
         </CameraConfiguration>
         <HazardSensorConfiguration Series="SEARCHAI">
-          <MaxRange>500.0</MaxRange>
+          <MaxRange>1500.0</MaxRange>
           <HorizontalFOV>10.0</HorizontalFOV>
           <VerticalFOV>10.0</VerticalFOV>
           <DetectableHazardTypes>
@@ -1151,6 +1152,7 @@
       <Time>0</Time>
       <Info/>
     </AirVehicleState>
+    
     <AirVehicleConfiguration Time="0.0" Series="CMASI">
       <MinimumSpeed>15.0</MinimumSpeed>
       <MaximumSpeed>25.0</MaximumSpeed>
@@ -1254,7 +1256,7 @@
           <Parameters/>
         </CameraConfiguration>
         <HazardSensorConfiguration Series="SEARCHAI">
-          <MaxRange>1000.0</MaxRange>
+          <MaxRange>2000.0</MaxRange>
           <HorizontalFOV>10.0</HorizontalFOV>
           <VerticalFOV>10.0</VerticalFOV>
           <DetectableHazardTypes>
@@ -1440,7 +1442,7 @@
           <Parameters/>
         </CameraConfiguration>
         <HazardSensorConfiguration Series="SEARCHAI">
-          <MaxRange>1000.0</MaxRange>
+          <MaxRange>2000.0</MaxRange>
           <HorizontalFOV>10.0</HorizontalFOV>
           <VerticalFOV>10.0</VerticalFOV>
           <DetectableHazardTypes>
@@ -1523,6 +1525,7 @@
       <Time>0</Time>
       <Info/>
     </AirVehicleState>
+
     <WeatherReport Series="CMASI">
       <WindSpeed>0.0</WindSpeed>
       <WindDirection>0.0</WindDirection>
@@ -1592,7 +1595,7 @@
       </Boundary>
     </HazardZone>
     <HazardZone Series="SEARCHAI">
-      <ZoneType>Fire</ZoneType>
+      <ZoneType>Smoke</ZoneType>
       <ZoneID>3</ZoneID>
       <MinAltitude>0.0</MinAltitude>
       <MinAltitudeType>AGL</MinAltitudeType>
@@ -1810,11 +1813,12 @@
         </Polygon>
       </Boundary>
     </HazardZone>
+
     <HazardZoneChangeCommand Series="SEARCHAI" Time="0">
       <ZoneID>1</ZoneID>
       <GrowthRate>0.5</GrowthRate>
-      <TranslationRate>0.0</TranslationRate>
-      <TranslationDirection>0.0</TranslationDirection>
+      <TranslationRate>60.0</TranslationRate>
+      <TranslationDirection>250.0</TranslationDirection>
     </HazardZoneChangeCommand>
     <HazardZoneChangeCommand Series="SEARCHAI" Time="0">
       <ZoneID>3</ZoneID>
@@ -1825,8 +1829,8 @@
     <HazardZoneChangeCommand Series="SEARCHAI" Time="0">
       <ZoneID>4</ZoneID>
       <GrowthRate>1.0</GrowthRate>
-      <TranslationRate>0.0</TranslationRate>
-      <TranslationDirection>0.0</TranslationDirection>
+      <TranslationRate>110.0</TranslationRate>
+      <TranslationDirection>30.0</TranslationDirection>
     </HazardZoneChangeCommand>
     <HazardZoneChangeCommand Series="SEARCHAI" Time="0">
       <ZoneID>5</ZoneID>
